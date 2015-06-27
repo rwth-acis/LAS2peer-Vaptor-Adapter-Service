@@ -33,7 +33,6 @@
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/las2peer-annotationService/lib/las2peer-web-connector-0.3-SNAPSHOT.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/las2peer-annotationService/lib/xuggle-xuggler-5.4.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/las2peer-annotationService/lib/arangodb-java-driver-2.5.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Aarij/workspace/LAS2peer Vaptor Adapter Service/lib/httpclient-4.3.6.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/workspace/LAS2peer Vaptor Adapter Service/lib/javax.ws.rs-api-2.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/.m2/repository/org/json/json/20140107/json-20140107.jar">
 		<attributes>
@@ -44,5 +43,6 @@
 			<attribute name="maven.scope" value="compile"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/httpclient-4.3.6.jar"/>
 	<classpathentry kind="output" path="tmp/classes"/>
 </classpath>

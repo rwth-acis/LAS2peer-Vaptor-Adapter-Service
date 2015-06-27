@@ -169,7 +169,7 @@ public class AdapterClass extends Service {
 		try {
 			
 			// Get Annotations
-			request = new URI("http://137.226.58.24:8083/annotations/annotations?q="+searchString+"&part=duration,objectCollection,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
+			request = new URI("http://137.226.58.24:8083/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
 			
 			CloseableHttpClient httpClient = HttpClients.createDefault();
 			HttpGet get = new HttpGet(request);
@@ -202,7 +202,7 @@ public class AdapterClass extends Service {
 					// Get the object Ids from the response
 					objectIds[i] = new String(object.getString("objectId"));
 					
-					System.out.println("TIME: "+ Float.valueOf(object.getString("time")));
+					//System.out.println("TIME: "+ Float.valueOf(object.getString("time")));
 					
 					time[i] = Float.valueOf(object.getString("time"));
 					duration[i] = Float.valueOf(object.getString("duration"));
