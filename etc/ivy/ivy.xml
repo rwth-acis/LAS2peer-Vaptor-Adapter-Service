@@ -22,7 +22,7 @@
 		<dependency org="org.apache.httpcomponents" name="httpclient" rev="4.3.2"/>
 		<dependency org="org.apache.httpcomponents" name="httpcore" rev="4.4"/>
 		
-		<dependency org="xuggle" name="xuggle-xuggler" rev="5.4" />
+		
 		<dependency org="org.json" name="json" rev="20141113"/>
 		
 		

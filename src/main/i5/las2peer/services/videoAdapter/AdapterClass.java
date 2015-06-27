@@ -14,7 +14,6 @@ import i5.las2peer.restMapper.annotations.swagger.Notes;
 import i5.las2peer.restMapper.annotations.swagger.ResourceListApi;
 import i5.las2peer.security.Context;
 import i5.las2peer.security.UserAgent;
-import i5.las2peer.services.videoAdapter.VideoSplitter;
 import i5.las2peer.restMapper.annotations.GET;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
