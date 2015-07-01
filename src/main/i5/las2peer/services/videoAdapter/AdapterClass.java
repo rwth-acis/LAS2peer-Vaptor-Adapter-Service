@@ -4,59 +4,27 @@ import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
 import i5.las2peer.restMapper.MediaType;
 import i5.las2peer.restMapper.RESTMapper;
-import i5.las2peer.restMapper.annotations.Consumes;
-import i5.las2peer.restMapper.annotations.ContentParam;
-import i5.las2peer.restMapper.annotations.DELETE;
-import i5.las2peer.restMapper.annotations.POST;
-import i5.las2peer.restMapper.annotations.PUT;
-import i5.las2peer.restMapper.annotations.QueryParam;
-import i5.las2peer.restMapper.annotations.swagger.Notes;
-import i5.las2peer.restMapper.annotations.swagger.ResourceListApi;
-import i5.las2peer.security.Context;
-import i5.las2peer.security.UserAgent;
 import i5.las2peer.restMapper.annotations.GET;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
 import i5.las2peer.restMapper.annotations.Produces;
+import i5.las2peer.restMapper.annotations.QueryParam;
 import i5.las2peer.restMapper.annotations.Version;
 import i5.las2peer.restMapper.annotations.swagger.ApiInfo;
-import i5.las2peer.restMapper.annotations.swagger.ApiResponses;
 import i5.las2peer.restMapper.annotations.swagger.ApiResponse;
+import i5.las2peer.restMapper.annotations.swagger.ApiResponses;
 import i5.las2peer.restMapper.annotations.swagger.Summary;
 import i5.las2peer.restMapper.tools.ValidationResult;
 import i5.las2peer.restMapper.tools.XMLCheck;
 import i5.las2peer.services.videoAdapter.database.DatabaseManager;
-//import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
-import i5.las2peer.services.videoAdapter.idGenerateClient.IdGenerateClientClass;
+import i5.las2peer.services.videoAdapter.util.LocationService;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.net.URI;
+import java.net.URISyntaxException;
 
-//import org.junit.experimental.theories.ParametersSuppliedBy;
-
-
-
-
-
-
-
-
-
-
-
-
-import net.minidev.json.JSONValue;
-
-import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 //import org.apache.commons.httpclient.HttpClient;
@@ -64,28 +32,14 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 //import org.apache.commons.httpclient.HttpStatus;
 //import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import com.arangodb.ArangoDriver;
-import com.arangodb.ArangoException;
-import com.arangodb.CursorResultSet;
-import com.arangodb.entity.CursorEntity;
-import com.arangodb.entity.DeletedEntity;
-import com.arangodb.entity.DocumentEntity;
-import com.arangodb.entity.EdgeEntity;
 import com.arangodb.entity.GraphEntity;
-import com.arangodb.util.MapBuilder;
-
-import org.json.*;
-
-import com.google.gson.Gson;
-
-import java.net.URI;
-import java.net.URISyntaxException;
+//import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
+//import org.junit.experimental.theories.ParametersSuppliedBy;
 
 /**
  * LAS2peer Service
@@ -142,8 +96,6 @@ public class AdapterClass extends Service {
 	}
 
 	
-	
-	
 	@GET
 	@Path("getPlaylist")
 	public String getPlaylist(@QueryParam(name = "search", defaultValue = "*" ) String searchString){
@@ -152,6 +104,15 @@ public class AdapterClass extends Service {
 		dbm = new DatabaseManager();
 		dbm.init(driverName, databaseServer, port, database, username, password, hostName);
 		String annotations = getAnnotations(searchString);
+		
+		
+		
+	    
+		
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'M') + " Miles\n");
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'K') + " Kilometers\n");
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'N') + " Nautical Miles\n");
+		
 		return annotations;
 	}
 	
@@ -168,7 +129,7 @@ public class AdapterClass extends Service {
 		try {
 			
 			// Get Annotations
-			request = new URI("http://137.226.58.24:8083/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
+			request = new URI("http://192.168.0.10:8083/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
 			
 			CloseableHttpClient httpClient = HttpClients.createDefault();
 			HttpGet get = new HttpGet(request);
@@ -248,8 +209,11 @@ public class AdapterClass extends Service {
 			finalResult = fpc.applyPreferences(finalResult, driverName, databaseServer, port, database, username, password, hostName);
 			
 			RelevanceSorting rsort = new RelevanceSorting();
+			LocationSorting lsort = new LocationSorting();
 			System.out.println("RELEVANCE");
 			finalResult = rsort.sort(finalResult, searchString);
+			double userLat = 50.7743273, userLong = 6.1065564;
+			finalResult = lsort.sort(finalResult, userLat, userLong);
 			
 			System.out.println("check");
 			
@@ -281,7 +245,7 @@ public class AdapterClass extends Service {
 			
 			for(int k=0;k<size;k++){
 				
-				request = new URI("http://137.226.58.24:8081/video-details/videos/"+objectIds[k]+"?part=url");
+				request = new URI("http://192.168.0.10:8081/video-details/videos/"+objectIds[k]+"?part=url");
 				
 				CloseableHttpClient httpClient = HttpClients.createDefault();
 				HttpGet get = new HttpGet(request);
