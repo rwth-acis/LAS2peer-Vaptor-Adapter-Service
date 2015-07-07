@@ -2,9 +2,11 @@ package i5.las2peer.services.videoAdapter;
 
 import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
-import i5.las2peer.restMapper.MediaType;
+//import i5.las2peer.restMapper.MediaType;
 import i5.las2peer.restMapper.RESTMapper;
 import i5.las2peer.restMapper.annotations.GET;
+//import i5.las2peer.restMapper.annotations.POST;
+import i5.las2peer.restMapper.annotations.Consumes;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
 import i5.las2peer.restMapper.annotations.Produces;
@@ -38,8 +40,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
+
 //import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
 //import org.junit.experimental.theories.ParametersSuppliedBy;
+//import com.sun.jersey.multipart.FormDataParam;
+//import com.sun.jersey.*;
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
 
 /**
  * LAS2peer Service
@@ -95,15 +102,41 @@ public class AdapterClass extends Service {
 		//dbm = new DatabaseManager(username, password, host, port, database);
 	}
 
+	@GET
+	@Path("postUserProfile")
+	//@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public String postUserProfile(@QueryParam(name="Username" , defaultValue = "*") String username, @QueryParam(name = "location", defaultValue = "Aachen" ) String location, 
+			@QueryParam(name = "language", defaultValue = "English" ) String language, @QueryParam(name = "duration", defaultValue = "5" ) String duration){
+
+		System.out.println("LOCATION: "+location);
+		System.out.println("language: "+language);
+		System.out.println("username: "+username);
+		/*dbm = new DatabaseManager();
+		dbm.init(driverName, databaseServer, port, database, username, password, hostName);
+		String annotations = getAnnotations(func);
+		
+		
+		
+	    
+		
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'M') + " Miles\n");
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'K') + " Kilometers\n");
+		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'N') + " Nautical Miles\n");
+		
+		return annotations;*/
+		return language;
+	}
+	
+	
 	
 	@GET
 	@Path("getPlaylist")
-	public String getPlaylist(@QueryParam(name = "search", defaultValue = "*" ) String searchString){
+	public String getPlaylist(@QueryParam(name="Username" , defaultValue = "*") String username, @QueryParam(name = "search", defaultValue = "*" ) String searchString){
 
 		System.out.println("SEARCH: "+searchString);
 		dbm = new DatabaseManager();
-		dbm.init(driverName, databaseServer, port, database, username, password, hostName);
-		String annotations = getAnnotations(searchString);
+		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		String annotations = getAnnotations(searchString, username);
 		
 		
 		
@@ -117,7 +150,7 @@ public class AdapterClass extends Service {
 	}
 	
 	
-	private String getAnnotations(String searchString){
+	private String getAnnotations(String searchString, String username){
 		System.out.println("An1");
 		CloseableHttpResponse response = null;
 		URI request = null;
@@ -129,7 +162,7 @@ public class AdapterClass extends Service {
 		try {
 			
 			// Get Annotations
-			request = new URI("http://192.168.0.10:8083/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
+			request = new URI("http://eiche:7073/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
 			
 			CloseableHttpClient httpClient = HttpClients.createDefault();
 			HttpGet get = new HttpGet(request);
@@ -206,7 +239,7 @@ public class AdapterClass extends Service {
 				object.append("videoURL", videos[k]);
 			}
 			FOSPClass fpc = new FOSPClass();
-			finalResult = fpc.applyPreferences(finalResult, driverName, databaseServer, port, database, username, password, hostName);
+			finalResult = fpc.applyPreferences(finalResult, username, driverName, databaseServer, port, database, this.username, password, hostName);
 			
 			RelevanceSorting rsort = new RelevanceSorting();
 			LocationSorting lsort = new LocationSorting();
@@ -245,7 +278,7 @@ public class AdapterClass extends Service {
 			
 			for(int k=0;k<size;k++){
 				
-				request = new URI("http://192.168.0.10:8081/video-details/videos/"+objectIds[k]+"?part=url");
+				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url");
 				
 				CloseableHttpClient httpClient = HttpClients.createDefault();
 				HttpGet get = new HttpGet(request);

@@ -60,6 +60,8 @@ public class LocationSorting extends Service {
 			distance[i] = GreatCircleCalculation.distance(array[0], array[1], userLat, userLong, 'M');
 			
 			object.put("distance", distance[i]);
+			object.put("Latitude", array[0]);
+			object.put("Longitude", array[1]);
 			System.out.println("distance: "+distance[i]);
 			
 	        jsonValues.add(object);

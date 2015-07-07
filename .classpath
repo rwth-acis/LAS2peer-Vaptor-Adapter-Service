@@ -46,5 +46,16 @@
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/httpclient-4.3.6.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/commons-httpclient-3.1.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/commons-lang3-3.4.jar"/>
+	<classpathentry kind="lib" path="C:/Users/Aarij/.m2/repository/com/sun/jersey/contribs/jersey-multipart/1.8/jersey-multipart-1.8.jar">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+			<attribute name="maven.groupId" value="com.sun.jersey.contribs"/>
+			<attribute name="maven.artifactId" value="jersey-multipart"/>
+			<attribute name="maven.version" value="1.8"/>
+			<attribute name="maven.scope" value="compile"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/jersey-core-1.19.jar"/>
+	<classpathentry kind="lib" path="C:/Users/Aarij/git/LAS2peer Vaptor Adaptor Service/LAS2peer-Vaptor-Adapter-Service/lib/javax.ws.rs-api-2.0.1.jar"/>
 	<classpathentry kind="output" path="tmp/classes"/>
 </classpath>

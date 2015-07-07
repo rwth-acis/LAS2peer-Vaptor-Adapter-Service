@@ -23,7 +23,9 @@
 		<dependency org="org.apache.httpcomponents" name="httpcore" rev="4.4"/>
 		<dependency org="commons-httpclient" name="commons-httpclient" rev="3.1"/>
 		<dependency org="org.apache.commons" name="commons-lang3" rev="3.4"/>
-		
+		<dependency org="com.sun.jersey.contribs" name="jersey-multipart" rev="1.19"/>
+		<dependency org="com.sun.jersey" name="jersey-core" rev="1.19"/>
+		<dependency org="javax.ws.rs" name="javax.ws.rs-api" rev="2.0.1"/>
 		
 		
 		<dependency org="org.json" name="json" rev="20141113"/>
