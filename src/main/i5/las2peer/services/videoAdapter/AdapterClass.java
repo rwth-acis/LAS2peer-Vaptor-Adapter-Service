@@ -278,7 +278,7 @@ public class AdapterClass extends Service {
 			
 			for(int k=0;k<size;k++){
 				
-				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url");
+				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");
 				
 				CloseableHttpClient httpClient = HttpClients.createDefault();
 				HttpGet get = new HttpGet(request);
