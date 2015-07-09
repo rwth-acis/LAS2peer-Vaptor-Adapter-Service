@@ -30,6 +30,7 @@ import i5.las2peer.restMapper.tools.XMLCheck;
 //import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
 
 
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +44,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 //import org.junit.experimental.theories.ParametersSuppliedBy;
+
 
 
 
@@ -131,6 +133,17 @@ public class FOSPClass extends Service {
 		String[] preferences = dbm.getPreferences(user);
 		System.out.println("PREFERENCES: "+preferences[0]+" "+preferences[1]);
 		
+		int i=0;
+		while(!finalResult.isNull(i)){
+			JSONObject object = finalResult.getJSONObject(i);
+			if(!preferences[1].equals(object.getString("lang"))){
+				System.out.println("LANGUAGE: "+preferences[1]+" "+object.getString("lang"));
+				finalResult.remove(i);
+		    }
+			else{
+				i++;
+			}
+		}
 		
 		
 		//finalResult.remove(2);

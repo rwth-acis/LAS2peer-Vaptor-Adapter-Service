@@ -72,18 +72,44 @@ public class DatabaseManager
 		System.out.println("DB URL: "+url);
 	}
 
+	public void setPreferences(String [] preferences){
+		
+		int rowCount = 0;
+		try {
+			Class.forName(driver).newInstance();
+			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
+			
+			String insertQuery = " insert into profile (username, location, language, duration) values (?, ?, ?, ?)";
+			
+			PreparedStatement pstmt = conn.prepareStatement(insertQuery);
+			pstmt.setString(1, preferences[0]);
+			pstmt.setString(2, preferences[1]);
+			pstmt.setString(3, preferences[2]);
+			pstmt.setString(4, preferences[3]);
+			rowCount = pstmt.executeUpdate();
+			
+			conn.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
 	public String[] getPreferences(String username){
 		
 		//init();
-		System.out.println("in getPreferences");
+		System.out.println("in getPreferences, "+ username);
 		ResultSet res = null;
-		String preferences[]=new String[4];
-		String interests, language, domain, duration;
+		String preferences[]=new String[5];
+		String interests, language, domain, duration, location;
 		try {
 			Class.forName(driver).newInstance();
 			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
 			
 			String insertQuery = "SELECT * FROM profile WHERE username = ?";
+			
+			
 			PreparedStatement pstmt = conn.prepareStatement(insertQuery);
 			pstmt.setString(1, username);
 			res = pstmt.executeQuery();
@@ -94,11 +120,13 @@ public class DatabaseManager
 				language = res.getString("language");
 				domain = res.getString("domain");
 				duration = res.getString("duration");
+				location = res.getString("location");
 				
 				preferences[0]=interests;
 				preferences[1]=language;
 				preferences[2]=domain;
 				preferences[3]=duration;
+				preferences[4]=location;
 			}
 			
 			else{
@@ -112,4 +140,87 @@ public class DatabaseManager
 		}
 		return preferences;
 	}
+	
+	
+	public void userExists(String username){
+		
+		System.out.println("in update, "+ username);
+		ResultSet res = null;
+		
+		try {
+			Class.forName(driver).newInstance();
+			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
+			
+			String insertQuery = "SELECT * FROM profile WHERE username = ?";
+			
+			
+			PreparedStatement pstmt = conn.prepareStatement(insertQuery);
+			pstmt.setString(1, username);
+			res = pstmt.executeQuery();
+
+			if(!res.next()){
+				
+				String[] preferences = {username,"aachen","english","5"};
+				setPreferences(preferences);
+				
+			}
+			
+			else{
+				System.out.println("User Exists!");
+				//return false;
+			}
+
+			conn.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+public void update(String [] preferences){
+		
+		System.out.println("in update, "+ preferences[0]);
+		ResultSet res = null;
+		
+		String interests, language, domain, duration, location;
+		try {
+			Class.forName(driver).newInstance();
+			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
+			
+			String insertQuery = "SELECT * FROM profile WHERE username = ?";
+			
+			
+			PreparedStatement pstmt = conn.prepareStatement(insertQuery);
+			pstmt.setString(1, preferences[0]);
+			res = pstmt.executeQuery();
+
+			if(res.next()){
+				
+							
+				
+				String updateQuery = " update profile set location=?, language=?, duration=? where username=?";
+				//String query = "update users set num_points = ? where first_name = ?";
+				//"update budgetreport set sales= ? , cogs= ? where quarter="+ qTracker;
+				PreparedStatement pstmt_update = conn.prepareStatement(updateQuery);
+				
+				pstmt_update.setString(1, preferences[1]);
+				pstmt_update.setString(2, preferences[2]);
+				pstmt_update.setString(3, preferences[3]);
+				pstmt_update.setString(4, preferences[0]);
+				pstmt_update.executeUpdate();
+				
+			}
+			
+			else{
+				System.out.println("User Exists!");
+				//return false;
+			}
+
+			conn.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	
 }

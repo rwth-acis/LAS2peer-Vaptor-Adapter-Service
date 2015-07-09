@@ -48,7 +48,7 @@ public class LocationSorting extends Service {
 		List<JSONObject> jsonValues = new ArrayList<JSONObject>();
 		JSONArray sortedJsonArray = new JSONArray();
 		
-		System.out.println(finalResult.toString());
+		//System.out.println(finalResult.toString());
 		
 		while(!finalResult.isNull(i)){
 			JSONObject object = finalResult.getJSONObject(i);
@@ -95,7 +95,7 @@ public class LocationSorting extends Service {
 	        sortedJsonArray.put(jsonValues.get(j));
 	    }
 		
-		System.out.println("SORTED:"+sortedJsonArray.toString());
+		//System.out.println("SORTED:"+sortedJsonArray.toString());
 		
 		
 		return sortedJsonArray;

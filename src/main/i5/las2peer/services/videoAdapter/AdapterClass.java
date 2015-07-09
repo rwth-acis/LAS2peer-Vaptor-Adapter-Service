@@ -41,6 +41,7 @@ import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
 
+
 //import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
 //import org.junit.experimental.theories.ParametersSuppliedBy;
 //import com.sun.jersey.multipart.FormDataParam;
@@ -111,9 +112,12 @@ public class AdapterClass extends Service {
 		System.out.println("LOCATION: "+location);
 		System.out.println("language: "+language);
 		System.out.println("username: "+username);
-		/*dbm = new DatabaseManager();
-		dbm.init(driverName, databaseServer, port, database, username, password, hostName);
-		String annotations = getAnnotations(func);
+		dbm = new DatabaseManager();
+		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		
+		String [] preferences = {username,location,language,duration};
+		dbm.update(preferences);
+		/*String annotations = getAnnotations(func);
 		
 		
 		
@@ -136,10 +140,10 @@ public class AdapterClass extends Service {
 		System.out.println("SEARCH: "+searchString);
 		dbm = new DatabaseManager();
 		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		
+		dbm.userExists(username);
+		
 		String annotations = getAnnotations(searchString, username);
-		
-		
-		
 	    
 		
 		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'M') + " Miles\n");
@@ -217,27 +221,26 @@ public class AdapterClass extends Service {
 			size=i;
 			//int j = size;
 			String[] videos = new String[size];
+			String[] languages = new String[size];
 			
 			// Once again, 'j' is temporary, it will be 'size' 
 			videos = getVideoURLs(objectIds,size);
-			
-			System.out.println("An5");
+			languages = getVideoLang(objectIds,size);
 			
 			for(int k=0;k<size;k++){
 				float endtime = duration[k]+time[k];
 				videos[k]+="#t="+time[k]+","+endtime;
 			}
 			
-			//videos[0]+="#t=6,16";
-			//videos[1]+="#t=7,25";
-			//videos[2]+="#t=3,14";
-			
 			JSONObject object;
 			
 			for(int k=0;k<size;k++){
 				object = finalResult.getJSONObject(k);
 				object.append("videoURL", videos[k]);
+				//object.append("lang", languages[k]);
+				object.put("lang", languages[k]);
 			}
+			//System.out.println("FINAL RESULT: "+finalResult.toString());
 			FOSPClass fpc = new FOSPClass();
 			finalResult = fpc.applyPreferences(finalResult, username, driverName, databaseServer, port, database, this.username, password, hostName);
 			
@@ -245,8 +248,14 @@ public class AdapterClass extends Service {
 			LocationSorting lsort = new LocationSorting();
 			System.out.println("RELEVANCE");
 			finalResult = rsort.sort(finalResult, searchString);
-			double userLat = 50.7743273, userLong = 6.1065564;
-			finalResult = lsort.sort(finalResult, userLat, userLong);
+			//double userLat = 50.7743273, userLong = 6.1065564;
+			
+			dbm = new DatabaseManager();
+			dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+			String[] preferences = dbm.getPreferences(username);
+			LocationService ls = new LocationService();
+			double[] userltln = ls.getLongitudeLatitude(preferences[4]);
+			finalResult = lsort.sort(finalResult, userltln[0], userltln[1]);
 			
 			System.out.println("check");
 			
@@ -313,6 +322,55 @@ public class AdapterClass extends Service {
 
 		return videos;
 	}
+	
+private String[] getVideoLang(String[] objectIds, int size){
+		
+		String[] languages = new String[size];
+		CloseableHttpResponse response = null;
+		URI request = null;
+		
+		try {
+			
+			for(int k=0;k<size;k++){
+				
+				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");
+				
+				CloseableHttpClient httpClient = HttpClients.createDefault();
+				HttpGet get = new HttpGet(request);
+				
+				response = httpClient.execute(get);
+				
+				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+				
+				StringBuilder content = new StringBuilder();
+				String line;
+				
+				while (null != (line = rd.readLine())) {
+				    content.append(line);
+				}
+				
+				JSONObject object = new JSONObject(content.toString());
+				
+				languages[k] = new String(object.getString("language"));
+				//System.out.println(": "+videos[k]);
+			}
+			
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return languages;
+	}
+	
+	
+	
 	
 	
 	/*@GET

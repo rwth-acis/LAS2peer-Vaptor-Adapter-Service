@@ -46,7 +46,7 @@ public class RelevanceSorting extends Service {
 		JSONArray sortedJsonArray = new JSONArray();
 		String [] searchTerms;
 		
-		System.out.println(finalResult.toString());
+		//System.out.println(finalResult.toString());
 		
 		while(!finalResult.isNull(i)){
 			JSONObject object = finalResult.getJSONObject(i);
@@ -100,7 +100,7 @@ public class RelevanceSorting extends Service {
 	        sortedJsonArray.put(jsonValues.get(j));
 	    }
 		
-		System.out.println("SORTED:"+sortedJsonArray.toString());
+		//System.out.println("SORTED:"+sortedJsonArray.toString());
 		
 		
 		return sortedJsonArray;
