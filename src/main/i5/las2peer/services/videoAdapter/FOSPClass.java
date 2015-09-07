@@ -124,12 +124,15 @@ public class FOSPClass extends Service {
 		//dbm = new DatabaseManager(username, password, host, port, database);
 	}
 
-	
+	/*
 	public JSONArray applyPreferences(JSONArray finalResult, String user, String driverName, String databaseServer, String port, String database, String username, String password, String hostName){
 		System.out.println("Apply");
 		//DatabaseManager dbm = new DatabaseManager();
 		dbm = new DatabaseManager();
 		dbm.init(driverName, databaseServer, port, database, username, password, hostName);
+		
+		
+		
 		String[] preferences = dbm.getPreferences(user);
 		System.out.println("PREFERENCES: "+preferences[0]+" "+preferences[1]);
 		
@@ -150,6 +153,6 @@ public class FOSPClass extends Service {
 		
 		//String annotations = getAnnotations(searchString);
 		return finalResult;
-	}
+	}*/
 
 }

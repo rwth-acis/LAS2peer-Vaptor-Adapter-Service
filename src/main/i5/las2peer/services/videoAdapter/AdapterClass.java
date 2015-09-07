@@ -4,9 +4,11 @@ import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
 //import i5.las2peer.restMapper.MediaType;
 import i5.las2peer.restMapper.RESTMapper;
+import i5.las2peer.restMapper.annotations.ContentParam;
 import i5.las2peer.restMapper.annotations.GET;
 //import i5.las2peer.restMapper.annotations.POST;
 import i5.las2peer.restMapper.annotations.Consumes;
+import i5.las2peer.restMapper.annotations.POST;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
 import i5.las2peer.restMapper.annotations.Produces;
@@ -23,10 +25,25 @@ import i5.las2peer.services.videoAdapter.util.LocationService;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
+import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 //import org.apache.commons.httpclient.HttpClient;
@@ -36,10 +53,36 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.jivesoftware.smack.Chat;
+import org.jivesoftware.smack.MessageListener;
+import org.jivesoftware.smack.XMPPConnection;
+import org.jivesoftware.smack.XMPPException;
+import org.jivesoftware.smack.packet.Message;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
+
+import org.apache.commons.io.IOUtils;
+
+import com.nimbusds.oauth2.sdk.Response;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
@@ -80,20 +123,24 @@ public class AdapterClass extends Service {
 	private String charSet;
 	private String collation;
 	
-	
-	
+	//public static String userPreferenceService;
+	//public static String recommenderService;
+	//public static String annotationContext;
+	//public static String analyticsService;
 
 	private DatabaseManager dbm;
 	private String epUrl;
 	
 	GraphEntity graphNew;
 	
-	
+	//private String[] currentAdaptationStatus;
+	//private int id=0;
 	
 
 	public AdapterClass() {
 		// read and set properties values
 		setFieldValues();
+		//id=0;
 
 		if (!epUrl.endsWith("/")) {
 			epUrl += "/";
@@ -103,309 +150,57 @@ public class AdapterClass extends Service {
 		//dbm = new DatabaseManager(username, password, host, port, database);
 	}
 
-	@GET
-	@Path("postUserProfile")
-	//@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-	public String postUserProfile(@QueryParam(name="Username" , defaultValue = "*") String username, @QueryParam(name = "location", defaultValue = "Aachen" ) String location, 
-			@QueryParam(name = "language", defaultValue = "English" ) String language, @QueryParam(name = "duration", defaultValue = "5" ) String duration){
+	@POST
+	@Path("")
+	//@Consumes(MediaType.TEXT_PLAIN)
+	//public String postUserProfile(@HeaderParam(name="username" , defaultValue = "*") String username, @HeaderParam(name = "location", defaultValue = "*" ) String location, 
+			//@HeaderParam(name = "language", defaultValue = "*" ) String language, @HeaderParam(name = "duration", defaultValue = "*" ) String duration){
 
-		System.out.println("LOCATION: "+location);
-		System.out.println("language: "+language);
-		System.out.println("username: "+username);
-		dbm = new DatabaseManager();
-		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
-		
-		String [] preferences = {username,location,language,duration};
-		dbm.update(preferences);
-		/*String annotations = getAnnotations(func);
+	public Response recommend(@QueryParam(defaultValue = "", name = "recommend") boolean recommended){
 		
 		
+		return null;
 		
-	    
-		
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'M') + " Miles\n");
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'K') + " Kilometers\n");
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'N') + " Nautical Miles\n");
-		
-		return annotations;*/
-		return language;
 	}
 	
-	
+
 	
 	@GET
 	@Path("getPlaylist")
-	public String getPlaylist(@QueryParam(name="Username" , defaultValue = "*") String username, @QueryParam(name = "search", defaultValue = "*" ) String searchString){
+	public String getPlaylist(@QueryParam(name="sub" , defaultValue = "*") String subId, 
+			@QueryParam(name="username" , defaultValue = "*") String username, 
+			@QueryParam(name = "search", defaultValue = "*" ) String searchString,
+			@QueryParam(name = "lat", defaultValue = "*" ) String lat,
+			@QueryParam(name = "lng", defaultValue = "*" ) String lng){
 
-		System.out.println("SEARCH: "+searchString);
-		dbm = new DatabaseManager();
-		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		System.out.println("Adapter Service Checkpoint:0 -- request received"
+				+ " - User: "+username+" - Search Query: "+searchString);
+		//id++;
 		
-		dbm.userExists(username);
 		
-		String annotations = getAnnotations(searchString, username);
+		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng));
+		future.run();
+		String annotations = "No Annotation";
+		
+		try {
+			
+			annotations = future.get();
+	        //System.out.println("Result="+result);
+
+	    } catch (InterruptedException | ExecutionException e) {
+	    	
+	    	System.out.println("EXCEPTION!!!");
+	        e.printStackTrace();
+	    }
+		
+		//String annotations = getAndAdapt(searchString, username, id++);
 	    
-		
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'M') + " Miles\n");
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'K') + " Kilometers\n");
-		//System.out.println(GreatCircleCalculation.distance(32.9697, -96.80322, 29.46786, -98.53506, 'N') + " Nautical Miles\n");
-		
 		return annotations;
 	}
-	
-	
-	private String getAnnotations(String searchString, String username){
-		System.out.println("An1");
-		CloseableHttpResponse response = null;
-		URI request = null;
-		JSONArray finalResult = null;
-		 int size;
-		//videos[0] = new String("http://137.226.58.2:8888/v1/AUTH_451035e5f9504a878946697522070c43/public/lnikkila_37db04e1-d757-4d8e-a115-4e9e16e445ea.mp4");
-		//videos[1] = new String("http://137.226.58.2:8888/v1/AUTH_451035e5f9504a878946697522070c43/public/lnikkila_f3d7c17e-1178-44d8-99e1-07b0ca5d0d21.mp4");
-		//videos[2] = new String("http://137.226.58.2:8888/v1/AUTH_451035e5f9504a878946697522070c43/public/merja_cbc86557-31d6-4dc5-b532-74d8fe80eb34.mp4");
-		try {
-			
-			// Get Annotations
-			request = new URI("http://eiche:7073/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,objectCollection,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
-			
-			CloseableHttpClient httpClient = HttpClients.createDefault();
-			HttpGet get = new HttpGet(request);
-			
-			response = httpClient.execute(get);
-			
-			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			
-			StringBuilder content = new StringBuilder();
-			String line;
-			
-			while (null != (line = rd.readLine())) {
-			    content.append(line);
-			}
-			
-			// Parse Response to JSON
-			finalResult = new JSONArray(content.toString());
-			String[] objectIds = new String[finalResult.length()];
-			float time[] = new float[finalResult.length()];
-			float duration[] = new float[finalResult.length()];
-			// Remove the non-video annotations
-			int i=0;
-			while(!finalResult.isNull(i)){
-				JSONObject object = finalResult.getJSONObject(i);
-				if(!"Videos".equals(object.getString("objectCollection"))){
-					finalResult.remove(i);
-			    }
-				else{
-					//System.out.println("An2");
-					// Get the object Ids from the response
-					objectIds[i] = new String(object.getString("objectId"));
-					
-					//System.out.println("TIME: "+ Float.valueOf(object.getString("time")));
-					
-					time[i] = Float.valueOf(object.getString("time"));
-					duration[i] = Float.valueOf(object.getString("duration"));
-					
-					i++;
-					System.out.println("An3");
-				}
-			}
-			
-			
-			// Temporary code, to limit entries to 3
-			/*int j=3;
-			while(!finalResult.isNull(j)){
-					finalResult.remove(j);
-			}*/
-			
-			System.out.println("An4");
-			// The size of the following arrays would be 'size', but for now it is 'j' 
-			size=i;
-			//int j = size;
-			String[] videos = new String[size];
-			String[] languages = new String[size];
-			
-			// Once again, 'j' is temporary, it will be 'size' 
-			videos = getVideoURLs(objectIds,size);
-			languages = getVideoLang(objectIds,size);
-			
-			for(int k=0;k<size;k++){
-				float endtime = duration[k]+time[k];
-				videos[k]+="#t="+time[k]+","+endtime;
-			}
-			
-			JSONObject object;
-			
-			for(int k=0;k<size;k++){
-				object = finalResult.getJSONObject(k);
-				object.append("videoURL", videos[k]);
-				//object.append("lang", languages[k]);
-				object.put("lang", languages[k]);
-			}
-			//System.out.println("FINAL RESULT: "+finalResult.toString());
-			FOSPClass fpc = new FOSPClass();
-			finalResult = fpc.applyPreferences(finalResult, username, driverName, databaseServer, port, database, this.username, password, hostName);
-			
-			RelevanceSorting rsort = new RelevanceSorting();
-			LocationSorting lsort = new LocationSorting();
-			System.out.println("RELEVANCE");
-			finalResult = rsort.sort(finalResult, searchString);
-			//double userLat = 50.7743273, userLong = 6.1065564;
-			
-			dbm = new DatabaseManager();
-			dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
-			String[] preferences = dbm.getPreferences(username);
-			LocationService ls = new LocationService();
-			double[] userltln = ls.getLongitudeLatitude(preferences[4]);
-			finalResult = lsort.sort(finalResult, userltln[0], userltln[1]);
-			
-			System.out.println("check");
-			
-			
-			
-		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return finalResult.toString();
 
-	}
-	
-	
-	private String[] getVideoURLs(String[] objectIds, int size){
-		
-		String[] videos = new String[size];
-		CloseableHttpResponse response = null;
-		URI request = null;
-		
-		try {
-			
-			for(int k=0;k<size;k++){
-				
-				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");
-				
-				CloseableHttpClient httpClient = HttpClients.createDefault();
-				HttpGet get = new HttpGet(request);
-				
-				response = httpClient.execute(get);
-				
-				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-				
-				StringBuilder content = new StringBuilder();
-				String line;
-				
-				while (null != (line = rd.readLine())) {
-				    content.append(line);
-				}
-				
-				JSONObject object = new JSONObject(content.toString());
-				
-				videos[k] = new String(object.getString("url"));
-				System.out.println("VIDEO: "+videos[k]);
-			}
-			
-		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 
-		return videos;
-	}
 	
-private String[] getVideoLang(String[] objectIds, int size){
-		
-		String[] languages = new String[size];
-		CloseableHttpResponse response = null;
-		URI request = null;
-		
-		try {
-			
-			for(int k=0;k<size;k++){
-				
-				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");
-				
-				CloseableHttpClient httpClient = HttpClients.createDefault();
-				HttpGet get = new HttpGet(request);
-				
-				response = httpClient.execute(get);
-				
-				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-				
-				StringBuilder content = new StringBuilder();
-				String line;
-				
-				while (null != (line = rd.readLine())) {
-				    content.append(line);
-				}
-				
-				JSONObject object = new JSONObject(content.toString());
-				
-				languages[k] = new String(object.getString("language"));
-				//System.out.println(": "+videos[k]);
-			}
-			
-		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 
-		return languages;
-	}
-	
-	
-	
-	
-	
-	/*@GET
-	@Path("videoSegment")
-	public HttpResponse videoSegment(){
-		
-		//VideoSplitter v=new VideoSplitter(new File("D:/Pictures/Performances/Minute_Countdown_Timer.mp4"),1);
-		String file1 = "D:/Pictures/Performances/Minute_Countdown_Timer.mp4"; 
-		String file2 = "D:/Pictures/Performances/Minute_Countdown_Timer.mp4"; 
-		String mergefile = "D:/Pictures/Performances/Minute_Countdown_Timer_joined.mp4";
-		
-		//AdvancedVideoSplitter(new File("D:/Pictures/Performances/Performance2.mp4"),1);
-		try {
-			System.out.println("hello");
-			
-			VideoJoiner.join(file1, file2, mergefile);
-			
-			//v.splitFiles(1.4, 1.8);
-			System.out.println("hello2");
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return null;
-		
-	}*/
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	// ================= Swagger Resource Listing & API Declarations
 	// =====================
 
@@ -475,5 +270,531 @@ private String[] getVideoLang(String[] objectIds, int size){
 		}
 		return result;
 	}
+	
+}
+
+
+
+
+
+
+class Adapt implements Callable<String>{
+	
+	//private String[] currentAdaptationStatus;
+	//private ArrayList<String> currentAdaptationStatus = new ArrayList<String>();
+	private String searchString;
+	private String username;
+	private String lat;
+	private String lng;
+	//private int id;
+	
+	
+	private String userPreferenceService = "http://localhost:7075/preference";
+	private String annotationContext = "http://eiche:7073/annotations/annotationContexts";
+	private String analyticsService = "http://localhost:7076/analytics";
+	
+	
+	public Adapt(String searchString, String username, String lat, String lng) {
+		// TODO Auto-generated constructor stub
+		
+		this.searchString = searchString;
+		this.username = username;
+		this.lat=lat;
+		this.lng=lng;
+		//this.id = id;
+		//System.out.println("id value: "+id);
+		//currentAdaptationStatus = new String[1000];
+	}
+
+
+	
+	// Get various information from different services and produce adaptive results 
+	public String call() throws Exception{
+		
+		XMPP xmpp = new XMPP();
+	    XMPPConnection connection = xmpp.getConnection();
+		Chat chat = connection.getChatManager().createChat
+				(username+"@role-sandbox.eu", new MessageListener() {
+					
+					public void processMessage(Chat chat, Message message) {
+						
+					}
+					
+		});
+	
+				
+		//currentAdaptationStatus[id] = "Searching for "+ searchString;
+		chat.sendMessage("Searching for "+ searchString);
+		System.out.println("Adapter Service Checkpoint:1 -- started: getAndAdapt().");
+		CloseableHttpResponse response = null;
+		URI request = null;
+		JSONArray finalResult = null;
+		int size;
+		
+		try {
+			
+			// Get the annotations
+			request = new URI("http://eiche:7073/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,weight,id,objectCollection,domain,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
+			CloseableHttpClient httpClient = HttpClients.createDefault();
+			HttpGet get = new HttpGet(request);
+			response = httpClient.execute(get);
+			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+			StringBuilder content = new StringBuilder();
+			String line;
+			while (null != (line = rd.readLine())) {
+			    content.append(line);
+			}
+			
+			// Parse Response to JSON
+			finalResult = new JSONArray(content.toString());
+			String[] objectIds = new String[finalResult.length()];
+			float time[] = new float[finalResult.length()];
+			float duration[] = new float[finalResult.length()];
+			
+			//currentAdaptationStatus[id] = finalResult.length()+" results obtained!";
+			chat.sendMessage(finalResult.length()+" results obtained!");
+			
+			
+			// Remove non-video annotations & get time and duration
+			System.out.println("Adapter Service Checkpoint:2 -- removing non-video annotations.");
+			int i=0;
+			while(!finalResult.isNull(i)){
+				JSONObject object = finalResult.getJSONObject(i);
+				
+				if(!"Videos".equals(object.getString("objectCollection"))){
+					finalResult.remove(i);
+			    }
+				else{
+					// Get the object Ids from the response
+					objectIds[i] = new String(object.getString("objectId"));
+					//System.out.println("TIME: "+ Float.valueOf(object.getString("time")));
+					time[i] = Float.valueOf(object.getString("time"));
+					duration[i] = Float.valueOf(object.getString("duration"));
+					i++;
+				}
+			}
+			System.out.println("Adapter Service Checkpoint:3 -- non-video annotations removed.");
+			//currentAdaptationStatus[id] = finalResult.length()+" video results found!";
+			chat.sendMessage(finalResult.length()+" video results found!");
+			
+			
+			// Get Video URLs and their Languages from the video details service 
+			size=i;
+			String[] videos = new String[size];
+			String[] languages = new String[size];
+			
+			videos = getVideoURLs(objectIds,size);
+			languages = getVideoLang(objectIds,size);
+			
+			
+			
+			// Add play time and duration to the url
+			for(int k=0;k<size;k++){
+				float endtime = duration[k]+time[k];
+				videos[k]+="#t="+time[k]+","+endtime;
+			}
+			
+			
+			
+			// Add URLs and languages to the json objects
+			JSONObject object;
+			for(int k=0;k<size;k++){
+				object = finalResult.getJSONObject(k);
+				object.append("videoURL", videos[k]);
+				object.put("lang", languages[k]);
+			}
+			
+			
+
+			// Apply user preferences
+			System.out.println("Adapter Service Checkpoint:4 -- Applying User Preferences.");
+			//currentAdaptationStatus[id] = "Applying User Preferences.";
+			chat.sendMessage("Applying User Preferences.");
+			finalResult = applyPreferences(finalResult, searchString, username, chat);
+			System.out.println("Adapter Service Checkpoint:5 -- User Preferences applied.");
+			
+			
+			
+			// Save the search query and search results for recommendation 
+			/*dbm = new DatabaseManager();
+			dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+			dbm.saveSearch(searchString, finalResult.toString(), username);*/
+			
+			connection.disconnect();
+			
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//return IOUtils.toString(finalResult, StandardCharsets.UTF_8);
+		return finalResult.toString();
+
+	}
+	
+	
+	
+	
+	// Get URL information for each segment
+	private String[] getVideoURLs(String[] objectIds, int size){
+		
+		String[] videos = new String[size];
+		CloseableHttpResponse response = null;
+		URI request = null;
+		
+		try {
+			
+			for(int k=0;k<size;k++){
+				
+				// Get video details
+				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");
+				CloseableHttpClient httpClient = HttpClients.createDefault();
+				HttpGet get = new HttpGet(request);
+				response = httpClient.execute(get);
+				
+				// Parse the response
+				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+				StringBuilder content = new StringBuilder();
+				String line;
+				while (null != (line = rd.readLine())) {
+				    content.append(line);
+				}
+				JSONObject object = new JSONObject(content.toString());
+				
+				// Save in a String array
+				videos[k] = new String(object.getString("url"));
+			}
+			
+		} catch (URISyntaxException e) {
+			
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			
+			e.printStackTrace();
+		} catch (IOException e) {
+			
+			e.printStackTrace();
+		}
+
+		return videos;
+	}
+	
+	// Get language information for each segment
+	private String[] getVideoLang(String[] objectIds, int size){
+		
+		String[] languages = new String[size];
+		CloseableHttpResponse response = null;
+		URI request = null;
+		
+		try {
+			
+			for(int k=0;k<size;k++){
+				
+				// Get video details
+				request = new URI("http://eiche:7071/video-details/videos/"+objectIds[k]+"?part=url,language");				
+				CloseableHttpClient httpClient = HttpClients.createDefault();
+				HttpGet get = new HttpGet(request);
+				response = httpClient.execute(get);
+				
+				// Parse the response
+				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+				StringBuilder content = new StringBuilder();
+				String line;
+				while (null != (line = rd.readLine())) {
+				    content.append(line);
+				}
+				JSONObject object = new JSONObject(content.toString());
+				
+				// Save in a String array
+				languages[k] = new String(object.getString("language"));
+			}
+			
+		} catch (URISyntaxException e) {
+			//System.out.println(e);
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return languages;
+	}
+
+	// Adapt the results based on user preferences
+	private JSONArray applyPreferences(JSONArray finalResult, String searchString, 
+			String username, Chat chat){
+		
+		
+		try {
+			
+			// GETTING USER PREFERENCES
+			
+			System.out.println("Adapter Service Checkpoint:4a -- Getting User Preferences.");
+			String preferenceString = getResponse(userPreferenceService+"?username="+username);
+			JSONObject preferencesJSON = new JSONObject(preferenceString);
+	
+
+	
+			// LANGUAGE FILTERING
+			
+			System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering.");
+			//currentAdaptationStatus[id] = "Applying language filtering...";
+			chat.sendMessage("Applying language filtering...");
+			//currentAdaptationStatus.add(id, "Applying language filtering...");
+			languageFiltering(finalResult, preferencesJSON.getString("language"));
+			System.out.println(finalResult.toString());
+			
+			// RELEVANCE ORDERING
+	
+			System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering.");
+			//currentAdaptationStatus[id] = "Applying relevance ordering...";
+			chat.sendMessage("Applying relevance ordering...");
+			//currentAdaptationStatus.add(id, "Applying relevance ordering...");
+			RelevanceSorting rsort = new RelevanceSorting();
+			finalResult = rsort.sort(finalResult, searchString);
+			System.out.println(finalResult.toString());
+			
+			// LOCATION ORDERING
+			
+			System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering.");
+			//currentAdaptationStatus[id] = "Applying location ordering...";
+			chat.sendMessage("Applying location ordering...");
+			LocationSorting lsort = new LocationSorting();
+			if(lat.equals("*")){
+				finalResult = lsort.sort(finalResult, preferencesJSON.getString("location"), 
+						false);
+			}
+			else{
+				finalResult = lsort.sort(finalResult, lat+"-"+lng, true);
+			}
+			System.out.println(finalResult.toString());
+	
+			
+			// WEIGHT ORDERING
+			
+			System.out.println("Adapter Service Checkpoint:4e -- Applying segment weight ordering.");
+			//currentAdaptationStatus[id] = "Applying segment weight ordering...";
+			chat.sendMessage("Applying segment weight ordering...");
+			// get and sort w.r.t weight
+			finalResult = weightSort(getWeight(finalResult));
+			
+			System.out.println(finalResult);
+			
+			// TRIMMING BASED ON PREFERRED DURATION
+			
+			int i=0, currentDuration = 0;
+			//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
+			
+			// Converting the duration into minutes
+			String time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
+			String[] units = time.split(":"); //will break the string up into an array
+			int minutes = Integer.parseInt(units[0]); //first element
+			int seconds = Integer.parseInt(units[1]); //second element
+			int duration = 60*minutes + seconds; //add up our values
+			//System.out.println("minutes: "+minutes);
+			//System.out.println("seconds: "+seconds);
+			System.out.println("duration: "+duration);
+			
+			while(!finalResult.isNull(i)){
+				System.out.println("inside duration trimming");
+				System.out.println("Current duration: "+currentDuration);
+				if(currentDuration<=duration){
+					
+					JSONObject object = finalResult.getJSONObject(i);
+					
+					currentDuration += Integer.parseInt(object.getString("duration")
+							.replace("\n", ""));
+					i++;
+				}
+				else{
+					
+					finalResult.remove(i);
+				}
+				
+				
+			}
+			
+			System.out.println(finalResult.toString());
+		
+		} catch (XMPPException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return finalResult;
+		
+	}
+	
+	// Filter out all the segments with different language than the user preferred language
+	private JSONArray languageFiltering(JSONArray finalResult, String userLang){
+		
+		int i=0;
+		while(!finalResult.isNull(i)){
+			JSONObject object = finalResult.getJSONObject(i);
+			if(!userLang.equals(object.getString("lang"))){
+				System.out.println("Adapter Service Checkpoint:4b(a) -- User Language: "+userLang+" -- Video Language: "+object.getString("lang"));
+				finalResult.remove(i);
+		    }
+			else{
+				i++;
+			}
+		}
+		return finalResult;
+	}
+	
+	// Get weight for all the selected segments
+	private JSONArray getWeight(JSONArray finalResult){
+		
+		String preferenceString;
+		JSONObject object = new JSONObject();
+		
+		int i=0;
+		while(!finalResult.isNull(i)){
+			object = finalResult.getJSONObject(i);
+			
+			// Getting the annotation context to obtain the edge id
+			preferenceString = getResponse(annotationContext+"/"+object.getString("objectId")+"/"+object.getString("id"));
+
+			// Parsing the response
+			JSONArray annContext = new JSONArray(preferenceString);
+			JSONObject annContextObject = annContext.getJSONObject(0);
+			
+			// Getting the Edge Id
+			String edgeId = annContextObject.getString("id");
+			
+			// Getting the Weight for the segment
+			String weight = getResponse(analyticsService+"/"+"weight?edge="+edgeId);
+			
+			// Adding it to the JSON Object
+			object.put("weight", Integer.parseInt(weight.replace("\n", "")));
+			object.put("edgeId", Integer.parseInt(edgeId.replace("\n", "")));
+			i++;
+			
+		}
+		return finalResult;
+	}
+	
+	// Order the segments based on the Weight field in the JSON Objects
+	private JSONArray weightSort(JSONArray finalResult){
+		
+		int i=0;
+		List<JSONObject> jsonValues = new ArrayList<JSONObject>();
+		JSONArray sortedJsonArray = new JSONArray();
+		
+		while(!finalResult.isNull(i)){
+			JSONObject object = finalResult.getJSONObject(i);
+	        jsonValues.add(object);
+			i++;
+		}
+		
+		Collections.sort(jsonValues, new Comparator<JSONObject>() {
+	        //You can change "Name" with "ID" if you want to sort by ID
+	        private static final String KEY_NAME = "weight";
+
+	        public int compare(JSONObject a, JSONObject b) {
+	        	int valA=0;
+	        	int valB=0;
+	        	
+	            try {
+	            	System.out.println(a.get(KEY_NAME));
+	            	
+	            	valA =  (Integer) a.get(KEY_NAME);
+	            	valB =  (Integer) b.get(KEY_NAME);
+	            }
+	            catch (JSONException e) {
+	            	System.out.println(e);
+	            	
+	                //do something
+	            }
+	            //System.out.println("valA "+valA);
+	            return -Integer.compare(valA, valB);
+	            //return valA.compareTo(valB);
+	            //if you want to change the sort order, simply use the following:
+	            //return -valA.compareTo(valB);
+	        }
+	    });
+
+	    for (int j = 0; j < finalResult.length(); j++) {
+	        sortedJsonArray.put(jsonValues.get(j));
+	    }
+		return sortedJsonArray;
+	}
+	
+	// Get response from the given uri
+	private String getResponse(String uri){
+		
+		CloseableHttpResponse response = null;
+		URI httpRequest;
+		String preferenceString = null;
+		
+		try {
+			httpRequest = new URI(uri);
+		
+			CloseableHttpClient httpPreferenceService = HttpClients.createDefault();
+			HttpGet getPreferences = new HttpGet(httpRequest);
+			response = httpPreferenceService.execute(getPreferences);
+			
+	        HttpEntity entity = response.getEntity();
+	        
+	        if (entity != null) {
+	            InputStream instream = entity.getContent();
+	            preferenceString = convertStreamToString(instream);
+	            //System.out.println("RESPONSE: " + preferenceString);
+	            instream.close();
+	        }
+        
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        
+        return preferenceString;
+		
+	}
+	
+	private static String convertStreamToString(InputStream is) {
+		
+	    BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+	    StringBuilder sb = new StringBuilder();
+	
+	    String line = null;
+	    try {
+	        while ((line = reader.readLine()) != null) {
+	            sb.append(line + "\n");
+	        }
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    } finally {
+	        try {
+	            is.close();
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        }
+	    }
+	    return sb.toString();
+	}
+	
+	
+	
 
 }
+
+
+
+
+

@@ -29,7 +29,6 @@ import com.arangodb.entity.GraphEntity;
 
 public class RelevanceSorting extends Service {
 
-	//private DatabaseManager dbm;
 
 	GraphEntity graphNew;
 
@@ -38,7 +37,6 @@ public class RelevanceSorting extends Service {
 	}
 
 	public JSONArray sort(JSONArray finalResult, String SearchQuery){
-		System.out.println("Apply");
 		
 		int i=0;
 		int[] relevanceFactor = new int[finalResult.length()];
@@ -51,12 +49,12 @@ public class RelevanceSorting extends Service {
 		while(!finalResult.isNull(i)){
 			JSONObject object = finalResult.getJSONObject(i);
 			
-			System.out.println("ANNOTATION "+i);
+			//System.out.println("ANNOTATION "+i);
 			searchTerms = SearchQuery.split(" ");
 			
 			for(int l=0; l<searchTerms.length; l++){
 			
-				System.out.println("SEARCH TERM "+l+" "+ searchTerms[l]);
+				//System.out.println("SEARCH TERM "+l+" "+ searchTerms[l]);
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("keywords"));
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("text"));
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("title"));
@@ -64,7 +62,7 @@ public class RelevanceSorting extends Service {
 			
 			
 			object.put("relevanceFactor", relevanceFactor[i]);
-			System.out.println("relevanceFactor: "+relevanceFactor[i]);
+			//System.out.println("relevanceFactor: "+relevanceFactor[i]);
 			
 	        jsonValues.add(object);
 			
@@ -79,10 +77,8 @@ public class RelevanceSorting extends Service {
 	            
 	        	int valA=0;
 	        	int valB=0;
-	        	
-
-	            try {
-	                
+	            
+	        	try {
 	            	valA = (Integer) a.get(KEY_NAME);
 	            	valB = (Integer) b.get(KEY_NAME);
 	            		            }
@@ -99,10 +95,7 @@ public class RelevanceSorting extends Service {
 	    for (int j = 0; j < finalResult.length(); j++) {
 	        sortedJsonArray.put(jsonValues.get(j));
 	    }
-		
 		//System.out.println("SORTED:"+sortedJsonArray.toString());
-		
-		
 		return sortedJsonArray;
 	}
 	

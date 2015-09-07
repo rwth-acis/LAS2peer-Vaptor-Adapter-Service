@@ -14,12 +14,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
-//import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
-//import org.junit.experimental.theories.ParametersSuppliedBy;
-//import org.apache.commons.httpclient.HttpClient;
-//import org.apache.commons.httpclient.HttpMethod;
-//import org.apache.commons.httpclient.HttpStatus;
-//import org.apache.commons.httpclient.methods.GetMethod;
+
 
 /**
  * LAS2peer Service
@@ -31,17 +26,36 @@ import com.arangodb.entity.GraphEntity;
 
 public class LocationSorting extends Service {
 
-	//private DatabaseManager dbm;
-
 	GraphEntity graphNew;
 
 	public LocationSorting() {
 		
 	}
 	
-	
-	public JSONArray sort(JSONArray finalResult, double userLat, double userLong){
-		System.out.println("Location Sort");
+	public JSONArray sort(JSONArray finalResult, String location,
+			boolean isCurrentLocation){
+		
+		double lat, lng;
+		
+		if(isCurrentLocation){
+			
+			//System.out.println("lat: "+latlng[0]+"lng: "+latlng[1]);
+			String latlng[] = location.split("-");
+			System.out.println("lat: "+latlng[0]+"lng: "+latlng[1]);
+			lat = Double.parseDouble(latlng[0]);
+			lng = Double.parseDouble(latlng[1]);
+		}
+		else{
+			LocationService ls = new LocationService();
+			double[] userltln = ls.getLongitudeLatitude(location);
+			lat = userltln[0];
+			lng = userltln[1];
+		}
+			
+			
+		
+		
+		//System.out.println("Location Sort");
 		LocationService tDirectionService = new LocationService();
 		int i=0;
 		double[] distance = new double[finalResult.length()];
@@ -53,16 +67,15 @@ public class LocationSorting extends Service {
 		while(!finalResult.isNull(i)){
 			JSONObject object = finalResult.getJSONObject(i);
 			
-			System.out.println("ANNOTATION "+i);
-			
+			//System.out.println("ANNOTATION "+i);
 			
 		    double array[] = tDirectionService.getLongitudeLatitude(object.getString("location"));
-			distance[i] = GreatCircleCalculation.distance(array[0], array[1], userLat, userLong, 'M');
+			distance[i] = GreatCircleCalculation.distance(array[0], array[1], lat, lng, 'M');
 			
 			object.put("distance", distance[i]);
 			object.put("Latitude", array[0]);
 			object.put("Longitude", array[1]);
-			System.out.println("distance: "+distance[i]);
+			//System.out.println("distance: "+distance[i]);
 			
 	        jsonValues.add(object);
 			
@@ -77,9 +90,8 @@ public class LocationSorting extends Service {
 	            
 	        	double valA=0;
 	        	double valB=0;
-	        	
 
-	            try {
+	        	try {
 	                
 	            	valA = (Double) a.get(KEY_NAME);
 	            	valB = (Double) b.get(KEY_NAME);
