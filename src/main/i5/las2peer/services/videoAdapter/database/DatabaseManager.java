@@ -49,19 +49,20 @@ public class DatabaseManager
 		System.out.println("DB URL: "+url);
 	}
 
-	public void saveSearch(String searchString, String result, String username){
+	public void saveSearch(String searchString, String result, String username, String domain){
 		
 		int rowCount = 0;
 		try {
 			Class.forName(driver).newInstance();
 			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
-			
-			String insertQuery = "insert into searches (query, result, user) values (?, ?, ?)";
+			System.out.println("Domain: "+domain);
+			String insertQuery = "insert into searches (query, result, user, domain) values (?, ?, ?, ?)";
 			
 			PreparedStatement pstmt = conn.prepareStatement(insertQuery);
 			pstmt.setString(1, searchString);
 			pstmt.setString(2, result);
 			pstmt.setString(3, username);
+			pstmt.setString(4, domain);
 			
 			rowCount = pstmt.executeUpdate();
 			

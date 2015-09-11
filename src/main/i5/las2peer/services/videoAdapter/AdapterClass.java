@@ -176,9 +176,10 @@ public class AdapterClass extends Service {
 		System.out.println("Adapter Service Checkpoint:0 -- request received"
 				+ " - User: "+username+" - Search Query: "+searchString);
 		//id++;
+		dbm = new DatabaseManager();
+		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
 		
-		
-		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng));
+		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng, dbm));
 		future.run();
 		String annotations = "No Annotation";
 		
@@ -287,20 +288,21 @@ class Adapt implements Callable<String>{
 	private String lat;
 	private String lng;
 	//private int id;
-	
+	private DatabaseManager dbm;
 	
 	private String userPreferenceService = "http://localhost:7075/preference";
 	private String annotationContext = "http://eiche:7073/annotations/annotationContexts";
 	private String analyticsService = "http://localhost:7076/analytics";
 	
 	
-	public Adapt(String searchString, String username, String lat, String lng) {
+	public Adapt(String searchString, String username, String lat, String lng, DatabaseManager dbm) {
 		// TODO Auto-generated constructor stub
 		
 		this.searchString = searchString;
 		this.username = username;
 		this.lat=lat;
 		this.lng=lng;
+		this.dbm = dbm;
 		//this.id = id;
 		//System.out.println("id value: "+id);
 		//currentAdaptationStatus = new String[1000];
@@ -375,6 +377,7 @@ class Adapt implements Callable<String>{
 			}
 			System.out.println("Adapter Service Checkpoint:3 -- non-video annotations removed.");
 			//currentAdaptationStatus[id] = finalResult.length()+" video results found!";
+			chat.sendMessage("removing non-video annotations.");
 			chat.sendMessage(finalResult.length()+" video results found!");
 			
 			
@@ -395,7 +398,7 @@ class Adapt implements Callable<String>{
 			}
 			
 			
-			
+			String domain = null;
 			// Add URLs and languages to the json objects
 			JSONObject object;
 			for(int k=0;k<size;k++){
@@ -409,16 +412,25 @@ class Adapt implements Callable<String>{
 			// Apply user preferences
 			System.out.println("Adapter Service Checkpoint:4 -- Applying User Preferences.");
 			//currentAdaptationStatus[id] = "Applying User Preferences.";
-			chat.sendMessage("Applying User Preferences.");
+			//chat.sendMessage("Applying User Preferences.");
 			finalResult = applyPreferences(finalResult, searchString, username, chat);
 			System.out.println("Adapter Service Checkpoint:5 -- User Preferences applied.");
+			chat.sendMessage(finalResult.length()+" related vidoes found!");
 			
-			
+			object = finalResult.getJSONObject(0);
+			domain=object.getString("domain");
 			
 			// Save the search query and search results for recommendation 
-			/*dbm = new DatabaseManager();
-			dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
-			dbm.saveSearch(searchString, finalResult.toString(), username);*/
+			//dbm = new DatabaseManager();
+			//dbm.init(AdapterClass.driverName, AdapterClass.databaseServer, AdapterClass.port, AdapterClass.database, AdapterClass.username, AdapterClass.password, AdapterClass.hostName);
+			if(finalResult.length()!=0)
+				dbm.saveSearch(searchString, finalResult.toString(), username, domain);
+			
+			/*select max(id) id, result, user, query
+			from searchhistory.searches
+			group by query
+			having count(*) > 1*/
+			
 			
 			connection.disconnect();
 			
@@ -549,6 +561,7 @@ class Adapt implements Callable<String>{
 			//currentAdaptationStatus.add(id, "Applying language filtering...");
 			languageFiltering(finalResult, preferencesJSON.getString("language"));
 			System.out.println(finalResult.toString());
+			chat.sendMessage(finalResult.length()+" vidoes found!");
 			
 			// RELEVANCE ORDERING
 	
@@ -588,6 +601,7 @@ class Adapt implements Callable<String>{
 			
 			// TRIMMING BASED ON PREFERRED DURATION
 			
+			chat.sendMessage("Adjusting based on preferred duration...");
 			int i=0, currentDuration = 0;
 			//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
 			
@@ -673,10 +687,12 @@ class Adapt implements Callable<String>{
 			
 			// Getting the Weight for the segment
 			String weight = getResponse(analyticsService+"/"+"weight?edge="+edgeId);
+			String domain = getResponse(analyticsService+"/"+"domain?edge="+edgeId);
 			
 			// Adding it to the JSON Object
 			object.put("weight", Integer.parseInt(weight.replace("\n", "")));
 			object.put("edgeId", Integer.parseInt(edgeId.replace("\n", "")));
+			object.put("domain", domain.replace("\n", ""));
 			i++;
 			
 		}
