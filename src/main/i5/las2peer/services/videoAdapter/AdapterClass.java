@@ -70,21 +70,6 @@ import com.nimbusds.oauth2.sdk.Response;
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
 //import org.junit.experimental.theories.ParametersSuppliedBy;
 //import com.sun.jersey.multipart.FormDataParam;
@@ -167,7 +152,7 @@ public class AdapterClass extends Service {
 	
 	@GET
 	@Path("getPlaylist")
-	public String getPlaylist(@QueryParam(name="sub" , defaultValue = "*") String subId, 
+	public HttpResponse getPlaylist(@QueryParam(name="sub" , defaultValue = "*") String subId, 
 			@QueryParam(name="username" , defaultValue = "*") String username, 
 			@QueryParam(name = "search", defaultValue = "*" ) String searchString,
 			@QueryParam(name = "lat", defaultValue = "*" ) String lat,
@@ -175,7 +160,22 @@ public class AdapterClass extends Service {
 
 		System.out.println("Adapter Service Checkpoint:0 -- request received"
 				+ " - User: "+username+" - Search Query: "+searchString);
-		//id++;
+		
+		
+		if(!isInteger(lat)) lat = "*";
+		if(!isInteger(lng)) lng = "*";
+		if(username.isEmpty()|| username.equals("undefined")){
+			HttpResponse r = new HttpResponse("User is not signed in!");
+			r.setStatus(401);
+			return r;
+		}
+		if(searchString.isEmpty() || searchString.equals("undefined")){
+			HttpResponse r = new HttpResponse("Please enter a valid search query!");
+			r.setStatus(400);
+			return r;
+		}
+		
+		
 		dbm = new DatabaseManager();
 		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
 		
@@ -196,9 +196,25 @@ public class AdapterClass extends Service {
 		
 		//String annotations = getAndAdapt(searchString, username, id++);
 	    
-		return annotations;
+		HttpResponse r = new HttpResponse(annotations);
+		r.setStatus(200);
+		return r;
+		
+		//return ;
 	}
 
+	
+	public static boolean isInteger(String s) {
+	    try { 
+	        Integer.parseInt(s); 
+	    } catch(NumberFormatException e) { 
+	        return false; 
+	    } catch(NullPointerException e) {
+	        return false;
+	    }
+	    // only got here if we didn't return false
+	    return true;
+	}
 
 	
 
@@ -289,10 +305,12 @@ class Adapt implements Callable<String>{
 	private String lng;
 	//private int id;
 	private DatabaseManager dbm;
+	private XMPP xmpp;
+	private XMPPConnection connection;
 	
-	private String userPreferenceService = "http://localhost:7075/preference";
+	private String userPreferenceService = "http://eiche:7077/preference";
 	private String annotationContext = "http://eiche:7073/annotations/annotationContexts";
-	private String analyticsService = "http://localhost:7076/analytics";
+	private String analyticsService = "http://eiche:7076/analytics";
 	
 	
 	public Adapt(String searchString, String username, String lat, String lng, DatabaseManager dbm) {
@@ -300,9 +318,10 @@ class Adapt implements Callable<String>{
 		
 		this.searchString = searchString;
 		this.username = username;
-		this.lat=lat;
-		this.lng=lng;
+		this.lat = lat;
+		this.lng = lng;
 		this.dbm = dbm;
+		
 		//this.id = id;
 		//System.out.println("id value: "+id);
 		//currentAdaptationStatus = new String[1000];
@@ -311,10 +330,10 @@ class Adapt implements Callable<String>{
 
 	
 	// Get various information from different services and produce adaptive results 
-	public String call() throws Exception{
+	public String call(){
 		
-		XMPP xmpp = new XMPP();
-	    XMPPConnection connection = xmpp.getConnection();
+		xmpp = new XMPP();
+	    connection = xmpp.getConnection();
 		Chat chat = connection.getChatManager().createChat
 				(username+"@role-sandbox.eu", new MessageListener() {
 					
@@ -324,17 +343,18 @@ class Adapt implements Callable<String>{
 					
 		});
 	
-				
-		//currentAdaptationStatus[id] = "Searching for "+ searchString;
-		chat.sendMessage("Searching for "+ searchString);
-		System.out.println("Adapter Service Checkpoint:1 -- started: getAndAdapt().");
 		CloseableHttpResponse response = null;
 		URI request = null;
 		JSONArray finalResult = null;
 		int size;
-		
+				
 		try {
 			
+			//currentAdaptationStatus[id] = "Searching for "+ searchString;
+			chat.sendMessage("Searching for "+ searchString);
+			System.out.println("Adapter Service Checkpoint:1 -- started: getAndAdapt().");
+			
+		
 			// Get the annotations
 			request = new URI("http://eiche:7073/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,weight,id,objectCollection,domain,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation");
 			CloseableHttpClient httpClient = HttpClients.createDefault();
@@ -443,6 +463,10 @@ class Adapt implements Callable<String>{
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (XMPPException e) {
+			connection.disconnect();
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		//return IOUtils.toString(finalResult, StandardCharsets.UTF_8);
 		return finalResult.toString();
@@ -543,13 +567,22 @@ class Adapt implements Callable<String>{
 			String username, Chat chat){
 		
 		
-		try {
+		//try {
 			
 			// GETTING USER PREFERENCES
 			
 			System.out.println("Adapter Service Checkpoint:4a -- Getting User Preferences.");
 			String preferenceString = getResponse(userPreferenceService+"?username="+username);
-			JSONObject preferencesJSON = new JSONObject(preferenceString);
+			
+			JSONObject preferencesJSON = null;
+			try{
+				preferencesJSON = new JSONObject(preferenceString);
+				
+			}catch (JSONException e) {
+				connection.disconnect();
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	
 
 	
@@ -557,17 +590,37 @@ class Adapt implements Callable<String>{
 			
 			System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering.");
 			//currentAdaptationStatus[id] = "Applying language filtering...";
-			chat.sendMessage("Applying language filtering...");
+			try{
+				chat.sendMessage("Applying language filtering...");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			//currentAdaptationStatus.add(id, "Applying language filtering...");
-			languageFiltering(finalResult, preferencesJSON.getString("language"));
+			try{
+				languageFiltering(finalResult, preferencesJSON.getString("language"));
+			}catch (JSONException e) {
+				languageFiltering(finalResult, "en");
+				e.printStackTrace();
+			}
 			System.out.println(finalResult.toString());
-			chat.sendMessage(finalResult.length()+" vidoes found!");
+			try{
+				chat.sendMessage(finalResult.length()+" vidoes found!");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			
 			// RELEVANCE ORDERING
 	
 			System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering.");
 			//currentAdaptationStatus[id] = "Applying relevance ordering...";
-			chat.sendMessage("Applying relevance ordering...");
+			try{
+				chat.sendMessage("Applying relevance ordering...");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			//currentAdaptationStatus.add(id, "Applying relevance ordering...");
 			RelevanceSorting rsort = new RelevanceSorting();
 			finalResult = rsort.sort(finalResult, searchString);
@@ -577,11 +630,21 @@ class Adapt implements Callable<String>{
 			
 			System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering.");
 			//currentAdaptationStatus[id] = "Applying location ordering...";
-			chat.sendMessage("Applying location ordering...");
+			try{
+				chat.sendMessage("Applying location ordering...");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			LocationSorting lsort = new LocationSorting();
 			if(lat.equals("*")){
-				finalResult = lsort.sort(finalResult, preferencesJSON.getString("location"), 
+				try{
+					finalResult = lsort.sort(finalResult, preferencesJSON.getString("location"), 
 						false);
+				}catch (JSONException e) {
+					finalResult = lsort.sort(finalResult, "Aachen, Germany", false);
+					e.printStackTrace();
+				}
 			}
 			else{
 				finalResult = lsort.sort(finalResult, lat+"-"+lng, true);
@@ -593,20 +656,35 @@ class Adapt implements Callable<String>{
 			
 			System.out.println("Adapter Service Checkpoint:4e -- Applying segment weight ordering.");
 			//currentAdaptationStatus[id] = "Applying segment weight ordering...";
-			chat.sendMessage("Applying segment weight ordering...");
+			try{
+				chat.sendMessage("Applying segment weight ordering...");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			// get and sort w.r.t weight
 			finalResult = weightSort(getWeight(finalResult));
 			
 			System.out.println(finalResult);
 			
 			// TRIMMING BASED ON PREFERRED DURATION
-			
-			chat.sendMessage("Adjusting based on preferred duration...");
+			try{
+				chat.sendMessage("Adjusting based on preferred duration...");
+			}catch (XMPPException e){
+				connection.disconnect();
+				e.printStackTrace();
+			}
 			int i=0, currentDuration = 0;
 			//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
 			
 			// Converting the duration into minutes
-			String time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
+			String time = null;
+			try{
+				time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
+			}catch (JSONException e) {
+				time = "10:30"; //mm:ss
+				e.printStackTrace();
+			}
 			String[] units = time.split(":"); //will break the string up into an array
 			int minutes = Integer.parseInt(units[0]); //first element
 			int seconds = Integer.parseInt(units[1]); //second element
@@ -622,8 +700,13 @@ class Adapt implements Callable<String>{
 					
 					JSONObject object = finalResult.getJSONObject(i);
 					
-					currentDuration += Integer.parseInt(object.getString("duration")
+					try{
+						currentDuration += Integer.parseInt(object.getString("duration")
 							.replace("\n", ""));
+					}catch (JSONException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 					i++;
 				}
 				else{
@@ -636,13 +719,11 @@ class Adapt implements Callable<String>{
 			
 			System.out.println(finalResult.toString());
 		
-		} catch (XMPPException e) {
+		/*} catch (XMPPException e) {
+			connection.disconnect();
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (JSONException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		} */
 		
 		return finalResult;
 		
@@ -650,6 +731,28 @@ class Adapt implements Callable<String>{
 	
 	// Filter out all the segments with different language than the user preferred language
 	private JSONArray languageFiltering(JSONArray finalResult, String userLang){
+		
+		switch (userLang){
+		
+			case "eng":
+			case "English":
+			case "Eng":
+			case "english": {
+				userLang = "en";
+				break;
+			}
+			case "deutsch":
+			case "german":
+			case "Deutsch":
+			case "German": {
+				userLang = "de";
+				break;
+			}
+			default: {
+				userLang = "en";
+			}
+		}
+		
 		
 		int i=0;
 		while(!finalResult.isNull(i)){
