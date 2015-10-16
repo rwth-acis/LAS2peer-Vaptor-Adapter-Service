@@ -30,8 +30,11 @@
 		
 		
 		<dependency org="org.json" name="json" rev="20141113"/>
-		<dependency org="org.igniterealtime.smack" name="smack" rev="3.2.1"/>
-		<dependency org="org.igniterealtime.smack" name="smackx" rev="3.2.1"/>
+		<dependency org="org.igniterealtime.smack" name="smack-extensions" rev="4.1.4"/>
+		<dependency org="org.igniterealtime.smack" name="smack-core" rev="4.1.4"/>
+		<dependency org="org.igniterealtime.smack" name="smack-tcp" rev="4.1.4"/>
+		<dependency org="org.igniterealtime.smack" name="smack-java7" rev="4.1.4"/>
+		
 		
 		
 		

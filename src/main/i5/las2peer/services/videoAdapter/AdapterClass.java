@@ -4,10 +4,7 @@ import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
 //import i5.las2peer.restMapper.MediaType;
 import i5.las2peer.restMapper.RESTMapper;
-import i5.las2peer.restMapper.annotations.ContentParam;
 import i5.las2peer.restMapper.annotations.GET;
-//import i5.las2peer.restMapper.annotations.POST;
-import i5.las2peer.restMapper.annotations.Consumes;
 import i5.las2peer.restMapper.annotations.POST;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
@@ -21,7 +18,7 @@ import i5.las2peer.restMapper.annotations.swagger.Summary;
 import i5.las2peer.restMapper.tools.ValidationResult;
 import i5.las2peer.restMapper.tools.XMLCheck;
 import i5.las2peer.services.videoAdapter.database.DatabaseManager;
-import i5.las2peer.services.videoAdapter.util.LocationService;
+import i5.las2peer.services.videoAdapter.util.OIDC;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,44 +26,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.CloseableHttpResponse;
-//import org.apache.commons.httpclient.HttpClient;
-//import org.apache.commons.httpclient.HttpMethod;
-//import org.apache.commons.httpclient.HttpStatus;
-//import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.jivesoftware.smack.Chat;
-import org.jivesoftware.smack.MessageListener;
-import org.jivesoftware.smack.XMPPConnection;
-import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.packet.Message;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import com.arangodb.entity.GraphEntity;
-
-import org.apache.commons.io.IOUtils;
-
-import com.nimbusds.oauth2.sdk.Response;
 
 
 
@@ -74,8 +42,27 @@ import com.nimbusds.oauth2.sdk.Response;
 //import org.junit.experimental.theories.ParametersSuppliedBy;
 //import com.sun.jersey.multipart.FormDataParam;
 //import com.sun.jersey.*;
-import javax.ws.rs.*;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.core.MediaType;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.jivesoftware.smack.AbstractXMPPConnection;
+import org.jivesoftware.smack.SmackException.NotConnectedException;
+import org.jivesoftware.smack.XMPPConnection;
+import org.jivesoftware.smack.chat.*;
+import org.jivesoftware.smack.packet.Message;
+import org.jivesoftware.smack.tcp.XMPPTCPConnection;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.arangodb.entity.GraphEntity;
+import com.nimbusds.oauth2.sdk.Response;
 
 /**
  * LAS2peer Service
@@ -107,6 +94,7 @@ public class AdapterClass extends Service {
 	private String charEncoding;
 	private String charSet;
 	private String collation;
+	private String userinfo;
 	
 	//public static String userPreferenceService;
 	//public static String recommenderService;
@@ -153,18 +141,36 @@ public class AdapterClass extends Service {
 	@GET
 	@Path("getPlaylist")
 	public HttpResponse getPlaylist(@QueryParam(name="sub" , defaultValue = "*") String subId, 
-			@QueryParam(name="username" , defaultValue = "*") String username, 
+			//@QueryParam(name="username" , defaultValue = "*") String username, 
 			@QueryParam(name = "search", defaultValue = "*" ) String searchString,
 			@QueryParam(name = "lat", defaultValue = "*" ) String lat,
-			@QueryParam(name = "lng", defaultValue = "*" ) String lng){
+			@QueryParam(name = "lng", defaultValue = "*" ) String lng,
+			@QueryParam(name = "duration", defaultValue = "true" ) boolean duration,
+			@QueryParam(name = "language", defaultValue = "true" ) boolean language,
+			@QueryParam(name = "location", defaultValue = "true" ) boolean location,
+			@QueryParam(name = "adaptation", defaultValue = "true" ) boolean adaptation,
+			@QueryParam(name = "mobile", defaultValue = "false" ) boolean mobile,
+			@QueryParam(name = "Authorization", defaultValue = "") String token){
 
+		String username = null;
+		
+		System.out.println("TOKEN: "+token);
+		
+		if(token!=null){
+			   token = token.replace("Bearer ","");
+			   username = OIDC.verifyAccessToken(token, userinfo);
+		}
+			
+		
 		System.out.println("Adapter Service Checkpoint:0 -- request received"
 				+ " - User: "+username+" - Search Query: "+searchString);
 		
+		//Query parameters validation
 		
 		if(!isInteger(lat)) lat = "*";
 		if(!isInteger(lng)) lng = "*";
-		if(username.isEmpty()|| username.equals("undefined")){
+		if(username.isEmpty() || username.equals("undefined") || 
+				username.equals("error")){
 			HttpResponse r = new HttpResponse("User is not signed in!");
 			r.setStatus(401);
 			return r;
@@ -179,7 +185,8 @@ public class AdapterClass extends Service {
 		dbm = new DatabaseManager();
 		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
 		
-		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng, dbm));
+		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng, dbm,
+				duration, location, language, adaptation, mobile));
 		future.run();
 		String annotations = "No Annotation";
 		
@@ -200,9 +207,10 @@ public class AdapterClass extends Service {
 		r.setStatus(200);
 		return r;
 		
-		//return ;
 	}
 
+	
+	
 	
 	public static boolean isInteger(String s) {
 	    try { 
@@ -307,13 +315,19 @@ class Adapt implements Callable<String>{
 	private DatabaseManager dbm;
 	private XMPP xmpp;
 	private XMPPConnection connection;
+	private boolean duration;
+	private boolean location;
+	private boolean language;
+	private boolean adaptation;
+	private boolean mobile;
 	
 	private String userPreferenceService = "http://eiche:7077/preference";
 	private String annotationContext = "http://eiche:7073/annotations/annotationContexts";
 	private String analyticsService = "http://eiche:7076/analytics";
 	
 	
-	public Adapt(String searchString, String username, String lat, String lng, DatabaseManager dbm) {
+	public Adapt(String searchString, String username, String lat, String lng, DatabaseManager dbm,
+			boolean duration, boolean location, boolean language, boolean adaptation, boolean mobile) {
 		// TODO Auto-generated constructor stub
 		
 		this.searchString = searchString;
@@ -321,6 +335,11 @@ class Adapt implements Callable<String>{
 		this.lat = lat;
 		this.lng = lng;
 		this.dbm = dbm;
+		this.adaptation = adaptation;
+		this.duration = duration;
+		this.language = language;
+		this.location = location;
+		this.mobile = mobile;
 		
 		//this.id = id;
 		//System.out.println("id value: "+id);
@@ -333,16 +352,30 @@ class Adapt implements Callable<String>{
 	public String call(){
 		
 		xmpp = new XMPP();
-	    connection = xmpp.getConnection();
-		Chat chat = connection.getChatManager().createChat
+	    
+		connection = xmpp.getConnection();
+		//XMPPConnection con = connection;
+	    //ChatManager chatmgr = ChatManager.getInstanceFor(connection);
+	    Chat chat = ChatManager.getInstanceFor(connection).createChat(username+"@role-sandbox.eu", new ChatMessageListener() {
+
+
+
+			@Override
+			public void processMessage(org.jivesoftware.smack.chat.Chat arg0,
+					Message arg1) {
+				// TODO Auto-generated method stub
+				
+			}
+		});
+	    /*Chat chat = connection.getChatManager().createChat
 				(username+"@role-sandbox.eu", new MessageListener() {
 					
 					public void processMessage(Chat chat, Message message) {
 						
 					}
-					
-		});
+		});*/
 	
+		//chat.
 		CloseableHttpResponse response = null;
 		URI request = null;
 		JSONArray finalResult = null;
@@ -351,7 +384,12 @@ class Adapt implements Callable<String>{
 		try {
 			
 			//currentAdaptationStatus[id] = "Searching for "+ searchString;
-			chat.sendMessage("Searching for "+ searchString);
+			try{
+				chat.sendMessage("Searching for "+ searchString);
+			}catch (NotConnectedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			System.out.println("Adapter Service Checkpoint:1 -- started: getAndAdapt().");
 			
 		
@@ -373,9 +411,12 @@ class Adapt implements Callable<String>{
 			float time[] = new float[finalResult.length()];
 			float duration[] = new float[finalResult.length()];
 			
-			//currentAdaptationStatus[id] = finalResult.length()+" results obtained!";
-			chat.sendMessage(finalResult.length()+" results obtained!");
-			
+			try {
+				chat.sendMessage(finalResult.length()+" results obtained!");
+			} catch (NotConnectedException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 			
 			// Remove non-video annotations & get time and duration
 			System.out.println("Adapter Service Checkpoint:2 -- removing non-video annotations.");
@@ -397,9 +438,16 @@ class Adapt implements Callable<String>{
 			}
 			System.out.println("Adapter Service Checkpoint:3 -- non-video annotations removed.");
 			//currentAdaptationStatus[id] = finalResult.length()+" video results found!";
-			chat.sendMessage("removing non-video annotations.");
-			chat.sendMessage(finalResult.length()+" video results found!");
 			
+			try{
+				chat.sendMessage("removing non-video annotations.");
+				chat.sendMessage(finalResult.length()+" video results found!");
+			}catch (NotConnectedException e){
+				 chat.close(); 
+				 //connection.disconnect();
+				 xmpp.deleteConnection();
+				e.printStackTrace();
+			}
 			
 			// Get Video URLs and their Languages from the video details service 
 			size=i;
@@ -435,24 +483,36 @@ class Adapt implements Callable<String>{
 			//chat.sendMessage("Applying User Preferences.");
 			finalResult = applyPreferences(finalResult, searchString, username, chat);
 			System.out.println("Adapter Service Checkpoint:5 -- User Preferences applied.");
-			chat.sendMessage(finalResult.length()+" related vidoes found!");
+			try{
+				chat.sendMessage(finalResult.length()+" related vidoes found!");
+			}catch (NotConnectedException e){
+				 chat.close(); 
+				 //connection.disconnect();
+				 xmpp.deleteConnection();
+				e.printStackTrace();
+			}
 			
-			object = finalResult.getJSONObject(0);
-			domain=object.getString("domain");
+			
 			
 			// Save the search query and search results for recommendation 
 			//dbm = new DatabaseManager();
 			//dbm.init(AdapterClass.driverName, AdapterClass.databaseServer, AdapterClass.port, AdapterClass.database, AdapterClass.username, AdapterClass.password, AdapterClass.hostName);
-			if(finalResult.length()!=0)
+			if(finalResult.length()!=0){
+				object = finalResult.getJSONObject(0);
+				domain=object.getString("domain");
+				
 				dbm.saveSearch(searchString, finalResult.toString(), username, domain);
-			
+			}
 			/*select max(id) id, result, user, query
 			from searchhistory.searches
 			group by query
 			having count(*) > 1*/
 			
 			
-			connection.disconnect();
+			 chat.close(); 
+			 //connection.disconnect();
+			 xmpp.deleteConnection();
+			
 			
 		} catch (URISyntaxException e) {
 			// TODO Auto-generated catch block
@@ -461,10 +521,6 @@ class Adapt implements Callable<String>{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (XMPPException e) {
-			connection.disconnect();
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -579,7 +635,9 @@ class Adapt implements Callable<String>{
 				preferencesJSON = new JSONObject(preferenceString);
 				
 			}catch (JSONException e) {
-				connection.disconnect();
+				 chat.close(); 
+				 //connection.disconnect();
+				 xmpp.deleteConnection();
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -588,78 +646,95 @@ class Adapt implements Callable<String>{
 	
 			// LANGUAGE FILTERING
 			
-			System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering.");
-			//currentAdaptationStatus[id] = "Applying language filtering...";
-			try{
-				chat.sendMessage("Applying language filtering...");
-			}catch (XMPPException e){
-				connection.disconnect();
-				e.printStackTrace();
-			}
-			//currentAdaptationStatus.add(id, "Applying language filtering...");
-			try{
-				languageFiltering(finalResult, preferencesJSON.getString("language"));
-			}catch (JSONException e) {
-				languageFiltering(finalResult, "en");
-				e.printStackTrace();
-			}
-			System.out.println(finalResult.toString());
-			try{
-				chat.sendMessage(finalResult.length()+" vidoes found!");
-			}catch (XMPPException e){
-				connection.disconnect();
-				e.printStackTrace();
+			if(language){
+			
+				System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering.");
+				//currentAdaptationStatus[id] = "Applying language filtering...";
+				try{
+					chat.sendMessage("Applying language filtering...");
+				}catch (NotConnectedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				//currentAdaptationStatus.add(id, "Applying language filtering...");
+				try{
+					languageFiltering(finalResult, preferencesJSON.getString("language"));
+				}catch (JSONException e) {
+					languageFiltering(finalResult, "en");
+					e.printStackTrace();
+				}
+				System.out.println(finalResult.toString());
+				try{
+					chat.sendMessage(finalResult.length()+" vidoes found!");
+				}catch (NotConnectedException e){
+					 chat.close(); 
+					 //connection.disconnect();
+					 xmpp.deleteConnection();
+					e.printStackTrace();
+				}
 			}
 			
 			// RELEVANCE ORDERING
 	
-			System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering.");
-			//currentAdaptationStatus[id] = "Applying relevance ordering...";
-			try{
-				chat.sendMessage("Applying relevance ordering...");
-			}catch (XMPPException e){
-				connection.disconnect();
-				e.printStackTrace();
+			if(adaptation){
+				System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering.");
+				//currentAdaptationStatus[id] = "Applying relevance ordering...";
+				try{
+					chat.sendMessage("Applying relevance ordering...");
+				}catch (NotConnectedException e){
+					 chat.close(); 
+					 //connection.disconnect();
+					 xmpp.deleteConnection();
+					e.printStackTrace();
+				}
+				//currentAdaptationStatus.add(id, "Applying relevance ordering...");
+				RelevanceSorting rsort = new RelevanceSorting();
+				finalResult = rsort.sort(finalResult, searchString);
+				System.out.println(finalResult.toString());
+			
 			}
-			//currentAdaptationStatus.add(id, "Applying relevance ordering...");
-			RelevanceSorting rsort = new RelevanceSorting();
-			finalResult = rsort.sort(finalResult, searchString);
-			System.out.println(finalResult.toString());
 			
 			// LOCATION ORDERING
 			
-			System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering.");
-			//currentAdaptationStatus[id] = "Applying location ordering...";
-			try{
-				chat.sendMessage("Applying location ordering...");
-			}catch (XMPPException e){
-				connection.disconnect();
-				e.printStackTrace();
-			}
-			LocationSorting lsort = new LocationSorting();
-			if(lat.equals("*")){
+			if(location){
+				System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering.");
+				//currentAdaptationStatus[id] = "Applying location ordering...";
 				try{
-					finalResult = lsort.sort(finalResult, preferencesJSON.getString("location"), 
-						false);
-				}catch (JSONException e) {
-					finalResult = lsort.sort(finalResult, "Aachen, Germany", false);
+					chat.sendMessage("Applying location ordering...");
+				}catch (NotConnectedException e){
+					 chat.close(); 
+					 //connection.disconnect();
+					 xmpp.deleteConnection();
 					e.printStackTrace();
 				}
-			}
-			else{
-				finalResult = lsort.sort(finalResult, lat+"-"+lng, true);
-			}
-			System.out.println(finalResult.toString());
+				LocationSorting lsort = new LocationSorting();
+				if(lat.equals("*")){
+					try{
+						finalResult = lsort.sort(finalResult, preferencesJSON.getString("location"), 
+							false);
+					}catch (JSONException e) {
+						finalResult = lsort.sort(finalResult, "Aachen, Germany", false);
+						e.printStackTrace();
+					}
+				}
+				else{
+					finalResult = lsort.sort(finalResult, lat+"-"+lng, true);
+				}
+				System.out.println(finalResult.toString());
 	
+			}
 			
 			// WEIGHT ORDERING
 			
+			if(adaptation){
 			System.out.println("Adapter Service Checkpoint:4e -- Applying segment weight ordering.");
 			//currentAdaptationStatus[id] = "Applying segment weight ordering...";
 			try{
 				chat.sendMessage("Applying segment weight ordering...");
-			}catch (XMPPException e){
-				connection.disconnect();
+			}catch (NotConnectedException e){
+				 chat.close(); 
+				 //connection.disconnect();
+				 xmpp.deleteConnection();
 				e.printStackTrace();
 			}
 			// get and sort w.r.t weight
@@ -667,60 +742,112 @@ class Adapt implements Callable<String>{
 			
 			System.out.println(finalResult);
 			
+			}
+			
 			// TRIMMING BASED ON PREFERRED DURATION
-			try{
-				chat.sendMessage("Adjusting based on preferred duration...");
-			}catch (XMPPException e){
-				connection.disconnect();
-				e.printStackTrace();
-			}
-			int i=0, currentDuration = 0;
-			//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
-			
-			// Converting the duration into minutes
-			String time = null;
-			try{
-				time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
-			}catch (JSONException e) {
-				time = "10:30"; //mm:ss
-				e.printStackTrace();
-			}
-			String[] units = time.split(":"); //will break the string up into an array
-			int minutes = Integer.parseInt(units[0]); //first element
-			int seconds = Integer.parseInt(units[1]); //second element
-			int duration = 60*minutes + seconds; //add up our values
-			//System.out.println("minutes: "+minutes);
-			//System.out.println("seconds: "+seconds);
-			System.out.println("duration: "+duration);
-			
-			while(!finalResult.isNull(i)){
-				System.out.println("inside duration trimming");
-				System.out.println("Current duration: "+currentDuration);
-				if(currentDuration<=duration){
-					
-					JSONObject object = finalResult.getJSONObject(i);
-					
-					try{
-						currentDuration += Integer.parseInt(object.getString("duration")
-							.replace("\n", ""));
-					}catch (JSONException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+			JSONArray tempFinalResult = new JSONArray(finalResult.toString());
+			System.out.println("tempFinalResult 0: "+tempFinalResult);
+			if(duration){
+				try{
+					chat.sendMessage("Adjusting based on preferred duration...");
+				}catch (NotConnectedException e){
+					 chat.close(); 
+					 //connection.disconnect();
+					 xmpp.deleteConnection();
+					e.printStackTrace();
+				}
+				int i=0, currentDuration = 0, tempDuration=0;
+				//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
+				
+				// Converting the duration into minutes
+				String time = null;
+				try{
+					if(mobile){
+						System.out.println("mobile");
+						time = "5:00"; //mm:ss
 					}
-					i++;
+					else{
+						time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
+						System.out.println("Desktop");
+					}
+				}catch (JSONException e) {
+					time = "10:30"; //mm:ss
+					e.printStackTrace();
 				}
-				else{
-					
-					finalResult.remove(i);
+				String[] units = time.split(":"); //will break the string up into an array
+				int minutes = Integer.parseInt(units[0]); //first element
+				int seconds = Integer.parseInt(units[1]); //second element
+				int duration = 60*minutes + seconds; //add up our values
+				//System.out.println("minutes: "+minutes);
+				//System.out.println("seconds: "+seconds);
+				System.out.println("duration: "+duration);
+				
+				while(!finalResult.isNull(i)){
+					System.out.println("inside duration trimming");
+					System.out.println("Current duration: "+currentDuration);
+					if(currentDuration<=duration){
+						
+						JSONObject object = finalResult.getJSONObject(i);
+						
+						try{
+							tempDuration = Integer.parseInt(object.getString("duration")
+								.replace("\n", ""));
+						}catch (JSONException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+						if(mobile){
+							if(tempDuration<=60){
+								currentDuration += tempDuration;
+								i++;
+							}
+							else{
+								finalResult.remove(i);
+							}
+						}
+						else{
+							currentDuration += tempDuration;
+							i++;
+						}
+					}
+					else{
+						
+						finalResult.remove(i);
+					}
 				}
 				
-				
+				// If no video segment satisfied the mobile preferences
+				if(mobile && currentDuration==0){
+					System.out.println("mobile and duration = 0");
+					System.out.println("tempFinalResult: "+tempFinalResult);
+					i=0;
+					while(!tempFinalResult.isNull(i)){
+						if(currentDuration<=duration){
+							
+							JSONObject object = tempFinalResult.getJSONObject(i);
+							
+							try{
+								currentDuration = Integer.parseInt(object.getString("duration")
+									.replace("\n", ""));
+							}catch (JSONException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							i++;
+						}
+						else{
+							tempFinalResult.remove(i);
+						}
+					}
+					finalResult = tempFinalResult;
+				}
 			}
 			
 			System.out.println(finalResult.toString());
 		
 		/*} catch (XMPPException e) {
-			connection.disconnect();
+			 chat.close(); connection.disconnect();
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} */
