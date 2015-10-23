@@ -32,8 +32,8 @@ public class LocationSorting extends Service {
 		
 	}
 	
-	public JSONArray sort(JSONArray finalResult, String location,
-			boolean isCurrentLocation){
+	public JSONArray initializeSort(JSONArray finalResult, String location,
+			boolean isCurrentLocation, boolean locationBool){
 		
 		double lat, lng;
 		
@@ -81,6 +81,23 @@ public class LocationSorting extends Service {
 			
 			i++;
 		}
+		
+		
+		if(locationBool){
+			return sortedJsonArray = sorting(finalResult, jsonValues);
+		}
+		else{
+			for (int j = 0; j < finalResult.length(); j++) {
+		        sortedJsonArray.put(jsonValues.get(j));
+		    }
+			return sortedJsonArray;
+		}
+		
+	}
+	
+	public JSONArray sorting(JSONArray finalResult, List<JSONObject> jsonValues){
+		
+		JSONArray sortedJsonArray = new JSONArray();
 		
 		Collections.sort( jsonValues, new Comparator<JSONObject>() {
 	        //You can change "Name" with "ID" if you want to sort by ID

@@ -118,6 +118,7 @@ public class OIDC {
 			} catch (Exception e) {
 	
 				System.out.println("Couldn't parse UserInfo JSON object: " + e.getMessage());
+				return "error";
 			}
 			
 			
