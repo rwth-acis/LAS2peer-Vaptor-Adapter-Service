@@ -2,10 +2,8 @@ package i5.las2peer.services.videoAdapter;
 
 import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
-//import i5.las2peer.restMapper.MediaType;
 import i5.las2peer.restMapper.RESTMapper;
 import i5.las2peer.restMapper.annotations.GET;
-import i5.las2peer.restMapper.annotations.POST;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
 import i5.las2peer.restMapper.annotations.Produces;
@@ -34,15 +32,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
-
-
-
-
-//import i5.las2peer.services.videoCompiler.idGenerateClient.IdGenerateClientClass;
-//import org.junit.experimental.theories.ParametersSuppliedBy;
-//import com.sun.jersey.multipart.FormDataParam;
-//import com.sun.jersey.*;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.http.HttpEntity;
@@ -51,18 +40,17 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.jivesoftware.smack.AbstractXMPPConnection;
 import org.jivesoftware.smack.SmackException.NotConnectedException;
 import org.jivesoftware.smack.XMPPConnection;
-import org.jivesoftware.smack.chat.*;
+import org.jivesoftware.smack.chat.Chat;
+import org.jivesoftware.smack.chat.ChatManager;
+import org.jivesoftware.smack.chat.ChatMessageListener;
 import org.jivesoftware.smack.packet.Message;
-import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
-import com.nimbusds.oauth2.sdk.Response;
 
 /**
  * LAS2peer Service
@@ -83,7 +71,6 @@ import com.nimbusds.oauth2.sdk.Response;
 public class AdapterClass extends Service {
 
 	private String port;
-	//private String host;
 	private String username;
 	private String password;
 	private String database;
@@ -293,13 +280,10 @@ public class AdapterClass extends Service {
 
 class Adapt implements Callable<String>{
 	
-	//private String[] currentAdaptationStatus;
-	//private ArrayList<String> currentAdaptationStatus = new ArrayList<String>();
 	private String searchString;
 	private String username;
 	private String lat;
 	private String lng;
-	//private int id;
 	private DatabaseManager dbm;
 	private XMPP xmpp;
 	private XMPPConnection connection;
@@ -332,9 +316,6 @@ class Adapt implements Callable<String>{
 		this.mobile = mobile;
 		this.access_token = access_token;
 		
-		//this.id = id;
-		//System.out.println("id value: "+id);
-		//currentAdaptationStatus = new String[1000];
 	}
 
 
@@ -345,8 +326,6 @@ class Adapt implements Callable<String>{
 		xmpp = new XMPP();
 	    
 		connection = xmpp.getConnection();
-		//XMPPConnection con = connection;
-	    //ChatManager chatmgr = ChatManager.getInstanceFor(connection);
 	    Chat chat = ChatManager.getInstanceFor(connection).createChat(username+"@role-sandbox.eu", new ChatMessageListener() {
 
 
@@ -358,15 +337,6 @@ class Adapt implements Callable<String>{
 				
 			}
 		});
-	    /*Chat chat = connection.getChatManager().createChat
-				(username+"@role-sandbox.eu", new MessageListener() {
-					
-					public void processMessage(Chat chat, Message message) {
-						
-					}
-		});*/
-	
-		//chat.
 		CloseableHttpResponse response = null;
 		URI request = null;
 		JSONArray finalResult = null;
@@ -486,8 +456,6 @@ class Adapt implements Callable<String>{
 			
 			
 			// Save the search query and search results for recommendation 
-			//dbm = new DatabaseManager();
-			//dbm.init(AdapterClass.driverName, AdapterClass.databaseServer, AdapterClass.port, AdapterClass.database, AdapterClass.username, AdapterClass.password, AdapterClass.hostName);
 			if(finalResult.length()!=0){
 				object = finalResult.getJSONObject(0);
 				domain=object.getString("domain");
@@ -613,8 +581,6 @@ class Adapt implements Callable<String>{
 	private JSONArray applyPreferences(JSONArray finalResult, String searchString, 
 			String username, Chat chat, String access_token){
 		
-		
-		//try {
 			
 			// GETTING USER PREFERENCES
 			
@@ -1041,13 +1007,4 @@ class Adapt implements Callable<String>{
 	    }
 	    return sb.toString();
 	}
-	
-	
-	
-
 }
-
-
-
-
-

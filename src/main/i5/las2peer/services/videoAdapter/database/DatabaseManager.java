@@ -1,18 +1,10 @@
 package i5.las2peer.services.videoAdapter.database;
 
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet; 
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
-
-//import de.dbis.util.GetProperty;
 
 /**
  * 
@@ -22,7 +14,6 @@ import java.util.UUID;
  */
 public class DatabaseManager
 {
-	private final static String INPUT_FILE = "etc/i5.las2peer.services.videoAdapter.dbconnection.properties";
 	private static String url;
 	private static String host;
 	private static String port;
