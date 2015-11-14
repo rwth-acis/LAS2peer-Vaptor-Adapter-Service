@@ -4,6 +4,7 @@ import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.HttpResponse;
 import i5.las2peer.restMapper.RESTMapper;
 import i5.las2peer.restMapper.annotations.GET;
+import i5.las2peer.restMapper.annotations.POST;
 import i5.las2peer.restMapper.annotations.Path;
 import i5.las2peer.restMapper.annotations.PathParam;
 import i5.las2peer.restMapper.annotations.Produces;
@@ -25,6 +26,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -51,6 +53,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.arangodb.entity.GraphEntity;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.util.HashSet;
 
 /**
  * LAS2peer Service
@@ -123,7 +131,9 @@ public class AdapterClass extends Service {
 			@QueryParam(name = "duration", defaultValue = "true" ) boolean duration,
 			@QueryParam(name = "language", defaultValue = "true" ) boolean language,
 			@QueryParam(name = "location", defaultValue = "true" ) boolean location,
-			@QueryParam(name = "adaptation", defaultValue = "true" ) boolean adaptation,
+			@QueryParam(name = "relevance", defaultValue = "true" ) boolean relevance,
+			@QueryParam(name = "weightOrder", defaultValue = "true" ) boolean weightOrder,
+			@QueryParam(name = "sequence", defaultValue = "LRDOW" ) String sequence,
 			@QueryParam(name = "mobile", defaultValue = "false" ) boolean mobile,
 			@QueryParam(name = "Authorization", defaultValue = "") String token){
 
@@ -161,7 +171,7 @@ public class AdapterClass extends Service {
 		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
 		
 		FutureTask<String> future = new FutureTask<>(new Adapt(searchString, username, lat, lng, dbm,
-				duration, location, language, adaptation, mobile, token));
+				duration, location, language, mobile, relevance, weightOrder, sequence, token));
 		future.run();
 		String annotations = "No Annotation";
 		
@@ -184,7 +194,243 @@ public class AdapterClass extends Service {
 		
 	}
 
+	@GET
+	@Path("VideoPlaylist")
+	public HttpResponse getVideoPlaylist(
+			@QueryParam(name = "search", defaultValue = "*" ) String searchString,
+			@QueryParam(name = "Authorization", defaultValue = "") String token){
+
+		String username = null;
+		
+		System.out.println("TOKEN: "+token);
+		
+		if(token!=null){
+			   token = token.replace("Bearer ","");
+			   username = OIDC.verifyAccessToken(token, userinfo);
+		}
+			
+
+		System.out.println("SeViAnno Checkpoint:0 -- request received"
+				+ " - User: "+username+" - Search Query: "+searchString);
+		
+		//User validation
+		
+		if(username.isEmpty() || username.equals("undefined") || 
+				username.equals("error")){
+			HttpResponse r = new HttpResponse("User is not signed in!");
+			r.setStatus(401);
+			return r;
+		}
+		if(searchString.isEmpty() || searchString.equals("undefined")){
+			HttpResponse r = new HttpResponse("Please enter a valid search query!");
+			r.setStatus(400);
+			return r;
+		}
+		//String annotations = "No Annotation";
+		
+		// Get the annotations
+		String requestURI = "http://eiche:7073/annotations/annotations?q="+searchString.replaceAll(" ", ",")+"&part=duration,weight,id,objectCollection,domain,location,objectId,text,time,title,keywords&collection=TextTypeAnnotation";
+		String content = Adapt.getResponse(requestURI);
+		
+		
+		// Parse Response to JSON
+		JSONArray finalResult = new JSONArray(content);
+		String[] objectIds = new String[finalResult.length()];
+		
+		int i=0;
+		while(!finalResult.isNull(i)){
+			JSONObject object = finalResult.getJSONObject(i);
+			
+			if(!"Videos".equals(object.getString("objectCollection"))){
+				finalResult.remove(i);
+		    }
+			else{
+				// Get the object Ids from the response
+				objectIds[i] = new String(object.getString("objectId"));
+				
+				i++;
+			}
+		}
+		System.out.println("SeViAnno Checkpoint:1 -- non-video annotations removed, ObjectId obtained.");
+		
+		objectIds = new HashSet<String>(Arrays.asList(objectIds)).toArray(new String[0]);
+		
+		int size=objectIds.length;
+		
+		
+		
+		// Get Video URLs
+		
+		String[] videos = new String[size];
+		videos = Adapt.getVideoURLs(objectIds, size);
+		
+		// Append Video URLs
+		/*JSONObject object;
+		for(int k=0;k<size;k++){
+			object = finalResult.getJSONObject(k);
+			object.append("videoURL", videos[k]);
+		}*/
+		
+		//JsonElement root1 = new JsonParser().parse(object.toString());
+		//JsonObject o3 = root1.getAsJsonObject();
+
+		
+		
+		//JSONArray annotations = new JSONArray();
+		JsonArray  annotationArray = new JsonArray();
+		for(int j=0;j<size;j++){
+			String objectRequestURI = "http://eiche:7073/annotations/objects/"+objectIds[j]+"/annotations";
+			String objectContent = Adapt.getResponse(objectRequestURI);
+			
+			JsonElement root = new JsonParser().parse(objectContent);
+			JsonObject jsonObject = root.getAsJsonObject(); 
+			
+			JsonArray  jsonArray = jsonObject.getAsJsonArray("annotations");
+			
+			
+			
+			//System.out.println("Array: "+jsonArray.toString());
+			//System.out.println("length: "+jsonArray.size());
+			
+			
+			JsonObject o3 = new JsonObject();
+			o3.addProperty("videoURL", videos[j]);
+			
+			System.out.println("Before Loop!");
+			
+			annotationArray.add(o3);
+			JsonArray childAnnotationArray = new JsonArray();
+			for(int loop1=0;loop1<jsonArray.size();loop1++){
+				
+				JsonObject annotationObject = new JsonObject();
+				
+				JsonObject o1=jsonArray.get(loop1).getAsJsonObject();
+				
+				//System.out.println("o1: "+o1);
+				JsonObject ann=o1.get("annotation").getAsJsonObject();
+				JsonArray annContext=o1.get("annotationContexts").getAsJsonArray();
+				
+				System.out.println("In Loop "+loop1+", ann: "+ o1.get("annotation").toString());
+				System.out.println("In Loop, annContext: "+ o1.get("annotationContexts").toString());
+				
+				//System.out.println("ann: "+ann.toString());
+				annotationObject.addProperty("id", ann.get("id").getAsString());
+				annotationObject.addProperty("text", ann.get("text").getAsString());
+				annotationObject.addProperty("title", ann.get("title").getAsString());
+				annotationObject.addProperty("keywords", ann.get("keywords").getAsString());
+				
+				System.out.println("id: "+ann.get("id").getAsString()+" text: "+ann.get("text").getAsString()
+						+" title: "+ann.get("title").getAsString()+" keywords: "+ann.get("keywords").getAsString());
+				
+				
+				annotationObject.addProperty("duration", annContext.get(0).getAsJsonObject().get("duration").getAsString());
+				System.out.println("duration: "+annContext.get(0).getAsJsonObject().get("duration").getAsString());
+				
+				annotationObject.addProperty("time", annContext.get(0).getAsJsonObject().get("time").getAsString());
+				
+				System.out.println("time: "+annContext.get(0).getAsJsonObject().get("time").getAsString());
+				
+				float time, duration;
+				
+				time = Float.valueOf(annContext.get(0).getAsJsonObject().get("time").getAsString());
+				System.out.println("FloatTime: "+time);
+				duration = Float.valueOf(annContext.get(0).getAsJsonObject().get("duration").getAsString());
+				System.out.println("FloatDuration: "+duration);
+				float endtime = duration+time;
+				
+				System.out.println("Endtime: "+endtime);
+				
+				annotationObject.addProperty("videoURL", videos[j]+"#t="+time+","+endtime);
+				
+				System.out.println("VideoURL: "+videos[j]+"#t="+time+","+endtime);
+				
+				childAnnotationArray.add(annotationObject);
+			}
+			annotationArray.add(childAnnotationArray);
+			
+			System.out.println("After Loop!  "+annotationArray.toString());
+						
+		}
+	    
+		HttpResponse r = new HttpResponse(annotationArray.toString());
+		r.setStatus(200);
+		return r;
+		
+	}
 	
+	
+	
+	
+	
+	@POST
+	@Path("strategy")
+	public HttpResponse setStrategies(			
+			@QueryParam(name = "strategy", defaultValue = "*" ) String strategy,
+			@QueryParam(name = "duration", defaultValue = "0" ) int duration,
+			@QueryParam(name = "language", defaultValue = "0" ) int language,
+			@QueryParam(name = "location", defaultValue = "0" ) int location,
+			@QueryParam(name = "relevance", defaultValue = "0" ) int relevance,
+			@QueryParam(name = "weightOrder", defaultValue = "0" ) int weightOrder,
+			@QueryParam(name = "sequence", defaultValue = "" ) String sequence,
+			@QueryParam(name = "Authorization", defaultValue = "") String token){
+
+		String username = null;
+		
+		System.out.println("TOKEN: "+token);
+		
+		if(token!=null){
+			   token = token.replace("Bearer ","");
+			   username = OIDC.verifyAccessToken(token, userinfo);
+		}
+		
+		if(username.isEmpty() || username.equals("undefined") || 
+				username.equals("error")){
+			HttpResponse r = new HttpResponse("User is not signed in!");
+			r.setStatus(401);
+			return r;
+		}
+		
+		dbm = new DatabaseManager();
+		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		
+		String message = dbm.setStrategy(strategy, language, location, duration, relevance, 
+				weightOrder, sequence);
+		
+		HttpResponse r = new HttpResponse(message);
+		r.setStatus(200);
+		return r;
+	}
+	
+	@GET
+	@Path("strategy")
+	public HttpResponse getStrategies(			
+			@QueryParam(name = "Authorization", defaultValue = "") String token){
+
+		String username = null;
+		
+		System.out.println("TOKEN: "+token);
+		
+		if(token!=null){
+			   token = token.replace("Bearer ","");
+			   username = OIDC.verifyAccessToken(token, userinfo);
+		}
+		
+		if(username.isEmpty() || username.equals("undefined") || 
+				username.equals("error")){
+			HttpResponse r = new HttpResponse("User is not signed in!");
+			r.setStatus(401);
+			return r;
+		}
+		
+		dbm = new DatabaseManager();
+		dbm.init(driverName, databaseServer, port, database, this.username, password, hostName);
+		
+		String strategiesJSON = dbm.getStrategies();
+		
+		HttpResponse r = new HttpResponse(strategiesJSON);
+		r.setStatus(200);
+		return r;
+	}
 	
 	
 	public static boolean isInteger(String s) {
@@ -290,8 +536,11 @@ class Adapt implements Callable<String>{
 	private boolean duration;
 	private boolean location;
 	private boolean language;
-	private boolean adaptation;
+	//private boolean adaptation;
 	private boolean mobile;
+	private boolean relevance;
+	private boolean weightOrder;
+	private String sequence;
 	private String access_token;
 	
 	private String userPreferenceService = "http://eiche:7077/preference";
@@ -300,8 +549,8 @@ class Adapt implements Callable<String>{
 	
 	
 	public Adapt(String searchString, String username, String lat, String lng, DatabaseManager dbm,
-			boolean duration, boolean location, boolean language, boolean adaptation, 
-			boolean mobile, String access_token) {
+			boolean duration, boolean location, boolean language,
+			boolean mobile, boolean relevance, boolean weightOrder, String sequence, String access_token) {
 		// TODO Auto-generated constructor stub
 		
 		this.searchString = searchString;
@@ -309,12 +558,15 @@ class Adapt implements Callable<String>{
 		this.lat = lat;
 		this.lng = lng;
 		this.dbm = dbm;
-		this.adaptation = adaptation;
+		//this.adaptation = adaptation;
 		this.duration = duration;
 		this.language = language;
 		this.location = location;
+		this.relevance = relevance;
+		this.weightOrder = weightOrder; 
 		this.mobile = mobile;
 		this.access_token = access_token;
+		this.sequence = sequence;
 		
 	}
 
@@ -442,7 +694,7 @@ class Adapt implements Callable<String>{
 			System.out.println("Adapter Service Checkpoint:4 -- Applying User Preferences.");
 			//currentAdaptationStatus[id] = "Applying User Preferences.";
 			//chat.sendMessage("Applying User Preferences.");
-			finalResult = applyPreferences(finalResult, searchString, username, chat, access_token);
+			finalResult = applyPreferences(finalResult, searchString, username, sequence, chat, access_token);
 			System.out.println("Adapter Service Checkpoint:5 -- User Preferences applied.");
 			try{
 				chat.sendMessage(finalResult.length()+" related vidoes found!");
@@ -492,7 +744,7 @@ class Adapt implements Callable<String>{
 	
 	
 	// Get URL information for each segment
-	private String[] getVideoURLs(String[] objectIds, int size){
+	protected static String[] getVideoURLs(String[] objectIds, int size){
 		
 		String[] videos = new String[size];
 		CloseableHttpResponse response = null;
@@ -579,251 +831,261 @@ class Adapt implements Callable<String>{
 
 	// Adapt the results based on user preferences
 	private JSONArray applyPreferences(JSONArray finalResult, String searchString, 
-			String username, Chat chat, String access_token){
+			String username, String sequence, Chat chat, String access_token){
+			
+		// GETTING USER PREFERENCES
 		
+		System.out.println("Adapter Service Checkpoint:4a -- Getting User Preferences.");
+		String preferenceString = getResponse(userPreferenceService+"?Authorization="+access_token);
+		
+		JSONObject preferencesJSON = null;
+		try{
+			preferencesJSON = new JSONObject(preferenceString);
 			
-			// GETTING USER PREFERENCES
+		}catch (JSONException e) {
+			 chat.close();
+			 //connection.disconnect();
+			 xmpp.deleteConnection();
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		for(int j=0;j<sequence.length();j++){
 			
-			System.out.println("Adapter Service Checkpoint:4a -- Getting User Preferences.");
-			String preferenceString = getResponse(userPreferenceService+"?Authorization="+access_token);
+			switch (sequence.charAt(j)){
+					
+				// LANGUAGE FILTERING
 			
-			JSONObject preferencesJSON = null;
-			try{
-				preferencesJSON = new JSONObject(preferenceString);
-				
-			}catch (JSONException e) {
-				 chat.close();
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-	
-
-	
-			// LANGUAGE FILTERING
-			
-			System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering: "+language);
-			//currentAdaptationStatus[id] = "Applying language filtering...";
-			try{
-				chat.sendMessage("Applying language filtering... "+language);
-			}catch (NotConnectedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-			if(language){
-
-				//currentAdaptationStatus.add(id, "Applying language filtering...");
-				try{
-					languageFiltering(finalResult, preferencesJSON.getString("language"));
-				}catch (JSONException e) {
-					languageFiltering(finalResult, "en");
-					e.printStackTrace();
-				}
-				System.out.println(finalResult.toString());
-				
-			}
-			
-			try{
-				chat.sendMessage(finalResult.length()+" vidoes found!");
-			}catch (NotConnectedException e){
-				 chat.close(); 
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				e.printStackTrace();
-			}
-			
-			// RELEVANCE ORDERING
-	
-			System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering: "+adaptation);
-			//currentAdaptationStatus[id] = "Applying relevance ordering...";
-			try{
-				chat.sendMessage("Applying relevance ordering... "+ adaptation);
-			}catch (NotConnectedException e){
-				 chat.close(); 
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				e.printStackTrace();
-			}
-			
-			if(adaptation){
-				
-				//currentAdaptationStatus.add(id, "Applying relevance ordering...");
-				RelevanceSorting rsort = new RelevanceSorting();
-				finalResult = rsort.sort(finalResult, searchString);
-				System.out.println(finalResult.toString());
-			
-			}
-			
-			// LOCATION ORDERING
-			
-			System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering: "+location);
-			//currentAdaptationStatus[id] = "Applying location ordering...";
-			try{
-				chat.sendMessage("Applying location ordering... "+location);
-			}catch (NotConnectedException e){
-				 chat.close(); 
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				e.printStackTrace();
-			}
-			
-			//if(location){
-				
-				LocationSorting lsort = new LocationSorting();
-				if(lat.equals("*")){
+				case 'L':
+					
+					System.out.println("Adapter Service Checkpoint:4b -- Applying language filtering: "+language);
 					try{
-						finalResult = lsort.initializeSort(finalResult, preferencesJSON.getString("location"), 
-							false, location);
-					}catch (JSONException e) {
-						finalResult = lsort.initializeSort(finalResult, "Aachen, Germany", false,
-								location);
+						chat.sendMessage("Applying language filtering... "+language);
+					}catch (NotConnectedException e) {
+						chat.close(); 
+						xmpp.deleteConnection();
 						e.printStackTrace();
 					}
-				}
-				else{
-					finalResult = lsort.initializeSort(finalResult, lat+"-"+lng, true, location);
-				}
-				System.out.println(finalResult.toString());
-	
-			//}
-			
-			// WEIGHT ORDERING
-			
-			System.out.println("Adapter Service Checkpoint:4e -- Applying segment weight ordering: "+adaptation);
-			//currentAdaptationStatus[id] = "Applying segment weight ordering...";
-			try{
-				chat.sendMessage("Applying segment weight ordering... "+adaptation);
-			}catch (NotConnectedException e){
-				 chat.close(); 
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				e.printStackTrace();
-			}
-			
-			finalResult = getWeight(finalResult);
-			
-			if(adaptation){
-			
-			// get and sort w.r.t weight
-			//finalResult = weightSort(getWeight(finalResult));
-				finalResult = weightSort(finalResult);
-			
-				System.out.println(finalResult);
-			
-			}
-			
-			// TRIMMING BASED ON PREFERRED DURATION
-			JSONArray tempFinalResult = new JSONArray(finalResult.toString());
-			System.out.println("tempFinalResult 0: "+tempFinalResult);
-			
-			try{
-				chat.sendMessage("Adjusting based on preferred duration... "+duration);
-			}catch (NotConnectedException e){
-				 chat.close(); 
-				 //connection.disconnect();
-				 xmpp.deleteConnection();
-				e.printStackTrace();
-			}
-			
-			if(duration){
-				
-				int i=0, currentDuration = 0, tempDuration=0;
-				//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
-				
-				// Converting the duration into minutes
-				String time = null;
-				try{
-					if(mobile){
-						System.out.println("mobile");
-						time = "5:00"; //mm:ss
-					}
-					else{
-						time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
-						System.out.println("Desktop");
-					}
-				}catch (JSONException e) {
-					time = "10:30"; //mm:ss
-					e.printStackTrace();
-				}
-				String[] units = time.split(":"); //will break the string up into an array
-				int minutes = Integer.parseInt(units[0]); //first element
-				int seconds = Integer.parseInt(units[1]); //second element
-				int duration = 60*minutes + seconds; //add up our values
-				//System.out.println("minutes: "+minutes);
-				//System.out.println("seconds: "+seconds);
-				System.out.println("duration: "+duration);
-				
-				while(!finalResult.isNull(i)){
-					System.out.println("inside duration trimming");
-					System.out.println("Current duration: "+currentDuration);
-					if(currentDuration<=duration){
-						
-						JSONObject object = finalResult.getJSONObject(i);
-						
+					
+					if(language){
+
 						try{
-							tempDuration = Integer.parseInt(object.getString("duration")
-								.replace("\n", ""));
+							languageFiltering(finalResult, preferencesJSON.getString("language"));
 						}catch (JSONException e) {
-							// TODO Auto-generated catch block
+							languageFiltering(finalResult, "en");
 							e.printStackTrace();
 						}
+						System.out.println(finalResult.toString());
+					}
+					
+					try{
+						chat.sendMessage(finalResult.length()+" vidoes found!");
+					}catch (NotConnectedException e){
+						chat.close(); 
+						xmpp.deleteConnection();
+						e.printStackTrace();
+					}
+					
+					break;
+				
+				// RELEVANCE ORDERING
+				
+				case 'R':
+
+					System.out.println("Adapter Service Checkpoint:4c -- Applying relevance ordering: "+relevance);
+					//currentAdaptationStatus[id] = "Applying relevance ordering...";
+					try{
+						chat.sendMessage("Applying relevance ordering... "+ relevance);
+					}catch (NotConnectedException e){
+						chat.close(); 
+						xmpp.deleteConnection();
+						e.printStackTrace();
+					}
+					
+					if(relevance){
+						RelevanceSorting rsort = new RelevanceSorting();
+						finalResult = rsort.sort(finalResult, searchString);
+						System.out.println(finalResult.toString());
+					}
+					break;
+				
+				// LOCATION ORDERING
+				case 'O':
+					
+					System.out.println("Adapter Service Checkpoint:4d -- Applying location ordering: "+location);
+					//currentAdaptationStatus[id] = "Applying location ordering...";
+					try{
+						chat.sendMessage("Applying location ordering... "+location);
+					}catch (NotConnectedException e){
+						chat.close(); 
+						xmpp.deleteConnection();
+						e.printStackTrace();
+					}
 						
-						if(mobile){
-							if(tempDuration<=60){
-								currentDuration += tempDuration;
-								i++;
+					LocationSorting lsort = new LocationSorting();
+					if(lat.equals("*")){
+						try{
+							finalResult = lsort.initializeSort(finalResult, preferencesJSON.getString("location"), 
+								false, location);
+						}catch (JSONException e) {
+							finalResult = lsort.initializeSort(finalResult, "Aachen, Germany", false,
+									location);
+							e.printStackTrace();
+						}
+					}
+					else{
+						finalResult = lsort.initializeSort(finalResult, lat+"-"+lng, true, location);
+					}
+					System.out.println(finalResult.toString());
+					
+					break;
+			
+				// WEIGHT ORDERING				
+				case 'W':
+
+					System.out.println("Adapter Service Checkpoint:4e -- Applying segment weight ordering: "+weightOrder);
+					try{
+						chat.sendMessage("Applying segment weight ordering... "+weightOrder);
+					}catch (NotConnectedException e){
+						chat.close(); 
+						xmpp.deleteConnection();
+						e.printStackTrace();
+					}
+					
+					finalResult = getWeight(finalResult);
+					
+					if(weightOrder){
+						// get and sort w.r.t weight
+						//finalResult = weightSort(getWeight(finalResult));
+						finalResult = weightSort(finalResult);
+						System.out.println(finalResult);
+					}
+					
+					break;
+				
+				// TRIMMING BASED ON PREFERRED DURATION					
+				case 'D':
+					
+					JSONArray tempFinalResult = new JSONArray(finalResult.toString());
+					System.out.println("tempFinalResult 0: "+tempFinalResult);
+					
+					try{
+						chat.sendMessage("Adjusting based on preferred duration... "+duration);
+					}catch (NotConnectedException e){
+						chat.close(); 
+						xmpp.deleteConnection();
+						e.printStackTrace();
+					}
+					
+					if(duration){
+						
+						int i=0, currentDuration = 0, tempDuration=0;
+						//int duration = Integer.parseInt(preferencesJSON.getString("duration").replace("\n", ""));
+						
+						// Converting the duration into minutes
+						String time = null;
+						try{
+							if(mobile){
+								System.out.println("mobile");
+								time = "5:00"; //mm:ss
 							}
 							else{
+								time = preferencesJSON.getString("duration").replace("\n", ""); //mm:ss
+								System.out.println("Desktop");
+							}
+						}catch (JSONException e) {
+							time = "10:30"; //mm:ss
+							e.printStackTrace();
+						}
+						String[] units = time.split(":"); //will break the string up into an array
+						int minutes = Integer.parseInt(units[0]); //first element
+						int seconds = Integer.parseInt(units[1]); //second element
+						int duration = 60*minutes + seconds; //add up our values
+						//System.out.println("minutes: "+minutes);
+						//System.out.println("seconds: "+seconds);
+						System.out.println("duration: "+duration);
+						
+						while(!finalResult.isNull(i)){
+							System.out.println("inside duration trimming");
+							System.out.println("Current duration: "+currentDuration);
+							if(currentDuration<=duration){
+								
+								JSONObject object = finalResult.getJSONObject(i);
+								
+								try{
+									tempDuration = Integer.parseInt(object.getString("duration")
+										.replace("\n", ""));
+								}catch (JSONException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+								
+								if(mobile){
+									if(tempDuration<=60){
+										currentDuration += tempDuration;
+										i++;
+									}
+									else{
+										finalResult.remove(i);
+									}
+								}
+								else{
+									currentDuration += tempDuration;
+									i++;
+								}
+							}
+							else{
+								
 								finalResult.remove(i);
 							}
 						}
-						else{
-							currentDuration += tempDuration;
-							i++;
-						}
-					}
-					else{
 						
-						finalResult.remove(i);
-					}
-				}
-				
-				// If no video segment satisfied the mobile preferences
-				if(mobile && currentDuration==0){
-					System.out.println("mobile and duration = 0");
-					System.out.println("tempFinalResult: "+tempFinalResult);
-					i=0;
-					while(!tempFinalResult.isNull(i)){
-						if(currentDuration<=duration){
-							
-							JSONObject object = tempFinalResult.getJSONObject(i);
-							
-							try{
-								currentDuration = Integer.parseInt(object.getString("duration")
-									.replace("\n", ""));
-							}catch (JSONException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
+						// If no video segment satisfied the mobile preferences
+						if(mobile && currentDuration==0){
+							System.out.println("mobile and duration = 0");
+							System.out.println("tempFinalResult: "+tempFinalResult);
+							i=0;
+							while(!tempFinalResult.isNull(i)){
+								if(currentDuration<=duration){
+									
+									JSONObject object = tempFinalResult.getJSONObject(i);
+									
+									try{
+										currentDuration = Integer.parseInt(object.getString("duration")
+											.replace("\n", ""));
+									}catch (JSONException e) {
+										// TODO Auto-generated catch block
+										e.printStackTrace();
+									}
+									i++;
+								}
+								else{
+									tempFinalResult.remove(i);
+								}
 							}
-							i++;
-						}
-						else{
-							tempFinalResult.remove(i);
+							finalResult = tempFinalResult;
 						}
 					}
-					finalResult = tempFinalResult;
-				}
+					
+					break;
 			}
 			
-			System.out.println(finalResult.toString());
+			
+		}
+
+
 		
-		/*} catch (XMPPException e) {
-			 chat.close(); connection.disconnect();
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} */
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		System.out.println(finalResult.toString());
 		
 		return finalResult;
 		
@@ -893,7 +1155,7 @@ class Adapt implements Callable<String>{
 			String domain = getResponse(analyticsService+"/"+"domain?edge="+edgeId);
 			
 			// Adding it to the JSON Object
-			object.put("weight", Integer.parseInt(weight.replace("\n", "")));
+			object.put("weight", Float.parseFloat(weight.replace("\n", "")));
 			object.put("edgeId", Integer.parseInt(edgeId.replace("\n", "")));
 			object.put("domain", domain.replace("\n", ""));
 			i++;
@@ -920,14 +1182,14 @@ class Adapt implements Callable<String>{
 	        private static final String KEY_NAME = "weight";
 
 	        public int compare(JSONObject a, JSONObject b) {
-	        	int valA=0;
-	        	int valB=0;
+	        	Double valA=0.0;
+	        	Double valB=0.0;
 	        	
 	            try {
 	            	System.out.println(a.get(KEY_NAME));
 	            	
-	            	valA =  (Integer) a.get(KEY_NAME);
-	            	valB =  (Integer) b.get(KEY_NAME);
+	            	valA =  a.getDouble(KEY_NAME);
+	            	valB =  b.getDouble(KEY_NAME);
 	            }
 	            catch (JSONException e) {
 	            	System.out.println(e);
@@ -935,7 +1197,7 @@ class Adapt implements Callable<String>{
 	                //do something
 	            }
 	            //System.out.println("valA "+valA);
-	            return -Integer.compare(valA, valB);
+	            return -Double.compare(valA, valB);
 	            //return valA.compareTo(valB);
 	            //if you want to change the sort order, simply use the following:
 	            //return -valA.compareTo(valB);
@@ -949,7 +1211,7 @@ class Adapt implements Callable<String>{
 	}
 	
 	// Get response from the given uri
-	private String getResponse(String uri){
+	protected static String getResponse(String uri){
 		
 		CloseableHttpResponse response = null;
 		URI httpRequest;

@@ -4,6 +4,10 @@ package i5.las2peer.services.videoAdapter.database;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+import org.json.JSONObject;
+import org.json.JSONArray;
 
 
 /**
@@ -63,5 +67,95 @@ public class DatabaseManager
 		}
 		
 	}
+	
+	public String setStrategy(String strategy, int language, int location, int duration, 
+			int relevance, int weightOrder, String sequence){
+		
+		String message = null;
+		int rowCount = 0;
+		ResultSet res = null;
+		try {
+			Class.forName(driver).newInstance();
+			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
+			
+			
+			
+			//String id = String.valueOf(language)+String.valueOf(location)+String.valueOf(duration)+
+					//String.valueOf(adaptation);
+			
+			//System.out.println("id: "+id);
+			
+			/*String selectQuery = "SELECT * FROM adaptive_strategies WHERE sequence = ?";
+			PreparedStatement selectPstmt = conn.prepareStatement(selectQuery);
+			selectPstmt.setString(1, sequence);
+			res = selectPstmt.executeQuery();*/
+			
+			//if(!res.next()){
+				
+				String insertQuery = "insert into adaptive_strategies (sequence, strategy, language, location, duration, "
+						+ "relevance, weightOrder) values (?, ?, ?, ?, ?, ?, ?)";
+				PreparedStatement insertPstmt = conn.prepareStatement(insertQuery);
+				insertPstmt.setString(1, sequence);
+				insertPstmt.setString(2, strategy);
+				insertPstmt.setInt(3, language);
+				insertPstmt.setInt(4, location);
+				insertPstmt.setInt(5, duration);
+				insertPstmt.setInt(6, relevance);
+				insertPstmt.setInt(7, weightOrder);
+				
+				rowCount = insertPstmt.executeUpdate();
+				message = "saved";
+				
+			/*}
+			else{
+				
+				message = res.getString("strategy");
+				
+			}*/
+			
+			conn.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return message;
+		
+	}
+	
+	public String getStrategies(){
+		
+		ResultSet res = null;
+		JSONArray strategyJSONArray = new JSONArray();
+		try {
+			Class.forName(driver).newInstance();
+			Connection conn = DriverManager.getConnection(url+dbName,userName,password);
+			
+			String selectQuery = "SELECT * FROM adaptive_strategies";
+			PreparedStatement selectPstmt = conn.prepareStatement(selectQuery);
+			res = selectPstmt.executeQuery();
+			
+			while(res.next()){
+				
+				JSONObject strategyJSON = new JSONObject();
+				
+				strategyJSON.put("strategy", res.getString("strategy"));
+				strategyJSON.put("language", res.getString("language"));
+				strategyJSON.put("location", res.getString("location"));
+				strategyJSON.put("duration", res.getString("duration"));
+				strategyJSON.put("relevance", res.getString("relevance"));
+				strategyJSON.put("weightOrder", res.getString("weightOrder"));
+				strategyJSON.put("sequence", res.getString("sequence"));
+				
+				strategyJSONArray.put(strategyJSON);
+			}
+			
+			conn.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return strategyJSONArray.toString();
+		
+	}
+	
+	
 	
 }
