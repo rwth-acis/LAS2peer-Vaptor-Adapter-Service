@@ -49,12 +49,10 @@ public class RelevanceSorting extends Service {
 		while(!finalResult.isNull(i)){
 			JSONObject object = finalResult.getJSONObject(i);
 			
-			//System.out.println("ANNOTATION "+i);
 			searchTerms = SearchQuery.split(" ");
 			
 			for(int l=0; l<searchTerms.length; l++){
 			
-				//System.out.println("SEARCH TERM "+l+" "+ searchTerms[l]);
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("keywords"));
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("text"));
 				relevanceFactor[i]+= getRelevanceFactor(searchTerms[l], object.getString("title"));
@@ -104,15 +102,11 @@ public class RelevanceSorting extends Service {
 		SearchTerm = SearchTerm.toLowerCase();
 		Annotation = Annotation.toLowerCase();
 		
-		String[] AnnSubList = Annotation.split(" ");
 		int relevanceFactor=0;
 		
-		//for(int i=0;i<AnnSubList.length;i++){
-			if (Annotation.contains(SearchTerm)){
-			//if(AnnSubList[i].contains(SearchTerm)){
-				relevanceFactor++;
-			}
-		//}
+		if (Annotation.contains(SearchTerm)){
+			relevanceFactor++;
+		}
 		return(relevanceFactor);
 		
 	}

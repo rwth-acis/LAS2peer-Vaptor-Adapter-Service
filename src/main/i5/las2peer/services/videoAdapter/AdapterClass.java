@@ -18,6 +18,7 @@ import i5.las2peer.restMapper.tools.ValidationResult;
 import i5.las2peer.restMapper.tools.XMLCheck;
 import i5.las2peer.services.videoAdapter.database.DatabaseManager;
 import i5.las2peer.services.videoAdapter.util.OIDC;
+import i5.las2peer.services.videoAdapter.util.StopWords;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -165,6 +166,11 @@ public class AdapterClass extends Service {
 			r.setStatus(400);
 			return r;
 		}
+		/*StopWords sw=new StopWords();
+		searchString = sw.remove(searchString);*/
+		
+		System.out.println("Stemmed search query: "+searchString);
+		
 		
 		
 		dbm = new DatabaseManager();
