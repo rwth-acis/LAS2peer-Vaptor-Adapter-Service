@@ -141,7 +141,7 @@ public class ServiceTest {
 		 * Tests the AdapterService for getting the adaptive video for a user
 		 */
 		//@Ignore("Used only for performance tests")
-		@Test
+		//@Test
 		public void testGetPlaylist()
 		{
 			MiniClient c = new MiniClient();
